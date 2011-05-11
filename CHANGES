@@ -1,3 +1,7 @@
+Changes in 2.5.0 (March 20, 2011)
+- Some minor performance improvments
+- CRC32 replaced with Adler32
+
 Changes in 2.4.5 (January 3, 2011)
 - Improved performance of reverse BWT and ST algorithms
 

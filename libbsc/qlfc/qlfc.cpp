@@ -47,6 +47,11 @@ See also the bsc and libbsc web site:
 #include "core/tables.h"
 #include "core/predictor.h"
 
+int bsc_qlfc_init(int features)
+{
+    return bsc_qlfc_init_static_model();
+}
+
 unsigned char * bsc_qlfc_transform(const unsigned char * input, unsigned char * buffer, int n, unsigned char * MTFTable)
 {
     unsigned char Flag[ALPHABET_SIZE];
@@ -110,7 +115,7 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
 {
     unsigned char MTFTable[ALPHABET_SIZE];
 
-    bsc_init_model(model);
+    bsc_qlfc_init_model(model);
 
     int contextRank0 = 0;
     int contextRank4 = 0;
@@ -424,7 +429,7 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
 {
     unsigned char MTFTable[ALPHABET_SIZE];
 
-    bsc_init_model(model);
+    bsc_qlfc_init_model(model);
 
     int contextRank0 = 0;
     int contextRank4 = 0;
@@ -709,7 +714,7 @@ int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, Bs
 
     unsigned char MTFTable[ALPHABET_SIZE];
 
-    bsc_init_model(model);
+    bsc_qlfc_init_model(model);
 
     int contextRank0 = 0;
     int contextRank4 = 0;
@@ -991,7 +996,7 @@ int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, Bs
 
     unsigned char MTFTable[ALPHABET_SIZE];
 
-    bsc_init_model(model);
+    bsc_qlfc_init_model(model);
 
     int contextRank0 = 0;
     int contextRank4 = 0;

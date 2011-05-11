@@ -46,6 +46,7 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 --*/
 
 #include <stdlib.h>
+#include <string.h>
 #include <memory.h>
 
 #include "../st/st.h"
@@ -56,6 +57,11 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 #include "../common/common.h"
 #include "../libbsc.h"
+
+int bsc_init(int features)
+{
+    return bsc_qlfc_init(features);
+}
 
 int bsc_store(const unsigned char * input, unsigned char * output, int n)
 {

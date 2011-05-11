@@ -489,15 +489,82 @@ int bsc_detect_recordsize(const unsigned char * input, int n, int features)
     {
         long long Entropy[DETECTORS_MAX_RECORD_SIZE];
 
+        if ((n % 48) != 0) n = n - (n % 48);
+
         for (int recordSize = 1; recordSize <= DETECTORS_MAX_RECORD_SIZE; ++recordSize)
         {
             memset(model, 0, sizeof(BscReorderingModel));
 
-            int Context[DETECTORS_MAX_RECORD_SIZE] = { 0 };
-            for (int record = 0, i = 0; i < n; ++i)
+            if (recordSize == 1)
             {
-                model->contexts[record][Context[record]].frequencies[input[i]]++;
-                Context[record] = input[i]; record++; if (record == recordSize) record = 0;
+                int ctx0 = 0;
+                for (int i = 0; i < n; i += 8)
+                {
+                    unsigned char c0 = input[i + 0]; model->contexts[0][ctx0].frequencies[c0]++; ctx0 = c0;
+                    unsigned char c1 = input[i + 1]; model->contexts[0][ctx0].frequencies[c1]++; ctx0 = c1;
+                    unsigned char c2 = input[i + 2]; model->contexts[0][ctx0].frequencies[c2]++; ctx0 = c2;
+                    unsigned char c3 = input[i + 3]; model->contexts[0][ctx0].frequencies[c3]++; ctx0 = c3;
+                    unsigned char c4 = input[i + 4]; model->contexts[0][ctx0].frequencies[c4]++; ctx0 = c4;
+                    unsigned char c5 = input[i + 5]; model->contexts[0][ctx0].frequencies[c5]++; ctx0 = c5;
+                    unsigned char c6 = input[i + 6]; model->contexts[0][ctx0].frequencies[c6]++; ctx0 = c6;
+                    unsigned char c7 = input[i + 7]; model->contexts[0][ctx0].frequencies[c7]++; ctx0 = c7;
+                }
+            }
+
+            if (recordSize == 2)
+            {
+                int ctx0 = 0, ctx1 = 0;
+                for (int i = 0; i < n; i += 8)
+                {
+                    unsigned char c0 = input[i + 0]; model->contexts[0][ctx0].frequencies[c0]++; ctx0 = c0;
+                    unsigned char c1 = input[i + 1]; model->contexts[1][ctx1].frequencies[c1]++; ctx1 = c1;
+                    unsigned char c2 = input[i + 2]; model->contexts[0][ctx0].frequencies[c2]++; ctx0 = c2;
+                    unsigned char c3 = input[i + 3]; model->contexts[1][ctx1].frequencies[c3]++; ctx1 = c3;
+                    unsigned char c4 = input[i + 4]; model->contexts[0][ctx0].frequencies[c4]++; ctx0 = c4;
+                    unsigned char c5 = input[i + 5]; model->contexts[1][ctx1].frequencies[c5]++; ctx1 = c5;
+                    unsigned char c6 = input[i + 6]; model->contexts[0][ctx0].frequencies[c6]++; ctx0 = c6;
+                    unsigned char c7 = input[i + 7]; model->contexts[1][ctx1].frequencies[c7]++; ctx1 = c7;
+                }
+            }
+
+            if (recordSize == 3)
+            {
+                int ctx0 = 0, ctx1 = 0, ctx2 = 0;
+                for (int i = 0; i < n; i += 6)
+                {
+                    unsigned char c0 = input[i + 0]; model->contexts[0][ctx0].frequencies[c0]++; ctx0 = c0;
+                    unsigned char c1 = input[i + 1]; model->contexts[1][ctx1].frequencies[c1]++; ctx1 = c1;
+                    unsigned char c2 = input[i + 2]; model->contexts[2][ctx2].frequencies[c2]++; ctx2 = c2;
+                    unsigned char c3 = input[i + 3]; model->contexts[0][ctx0].frequencies[c3]++; ctx0 = c3;
+                    unsigned char c4 = input[i + 4]; model->contexts[1][ctx1].frequencies[c4]++; ctx1 = c4;
+                    unsigned char c5 = input[i + 5]; model->contexts[2][ctx2].frequencies[c5]++; ctx2 = c5;
+                }
+            }
+
+            if (recordSize == 4)
+            {
+                int ctx0 = 0, ctx1 = 0, ctx2 = 0, ctx3 = 0;
+                for (int i = 0; i < n; i += 8)
+                {
+                    unsigned char c0 = input[i + 0]; model->contexts[0][ctx0].frequencies[c0]++; ctx0 = c0;
+                    unsigned char c1 = input[i + 1]; model->contexts[1][ctx1].frequencies[c1]++; ctx1 = c1;
+                    unsigned char c2 = input[i + 2]; model->contexts[2][ctx2].frequencies[c2]++; ctx2 = c2;
+                    unsigned char c3 = input[i + 3]; model->contexts[3][ctx3].frequencies[c3]++; ctx3 = c3;
+                    unsigned char c4 = input[i + 4]; model->contexts[0][ctx0].frequencies[c4]++; ctx0 = c4;
+                    unsigned char c5 = input[i + 5]; model->contexts[1][ctx1].frequencies[c5]++; ctx1 = c5;
+                    unsigned char c6 = input[i + 6]; model->contexts[2][ctx2].frequencies[c6]++; ctx2 = c6;
+                    unsigned char c7 = input[i + 7]; model->contexts[3][ctx3].frequencies[c7]++; ctx3 = c7;
+                }
+            }
+
+            if (recordSize > 4)
+            {
+                int Context[DETECTORS_MAX_RECORD_SIZE] = { 0 };
+                for (int record = 0, i = 0; i < n; ++i)
+                {
+                    model->contexts[record][Context[record]].frequencies[input[i]]++;
+                    Context[record] = input[i]; record++; if (record == recordSize) record = 0;
+                }
             }
 
             Entropy[recordSize - 1] = bsc_estimate_reordering(model, recordSize);

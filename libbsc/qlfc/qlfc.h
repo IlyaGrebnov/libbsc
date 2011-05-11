@@ -38,6 +38,13 @@ extern "C" {
 #endif
 
     /**
+    * You should call this function before you call any of the other functions in qlfc.
+    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
+    */
+    int bsc_qlfc_init(int features);
+
+    /**
     * Compress a memory block using Quantized Local Frequency Coding.
     * @param input - the input memory block of n bytes.
     * @param output - the output memory block of n bytes.

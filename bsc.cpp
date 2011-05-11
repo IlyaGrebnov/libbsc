@@ -66,7 +66,7 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 #define LIBBSC_CONTEXTS_AUTODETECT   3
 
-unsigned char bscFileSign[4] = {'b', 's', 'c', 0x24};
+unsigned char bscFileSign[4] = {'b', 's', 'c', 0x25};
 
 typedef struct BSC_BLOCK_HEADER
 {
@@ -159,7 +159,7 @@ void Compression(char * argv[])
 
     if (paramBlockSize > fileSize)
     {
-        paramBlockSize = fileSize;
+        paramBlockSize = (int)fileSize;
     }
 
     if (fwrite(bscFileSign, sizeof(bscFileSign), 1, fOutput) != 1)
@@ -831,7 +831,7 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.4.5. 3 January 2011.\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.5.0. 20 March 2011.\n");
     fprintf(stdout, "Copyright (c) 2009-2011 Ilya Grebnov <Ilya.Grebnov@libbsc.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)
@@ -839,6 +839,13 @@ int main(int argc, char * argv[])
     kmp_set_warnings_off();
 
 #endif
+
+    int result = bsc_init(LIBBSC_FEATURE_NONE);
+    if (result != LIBBSC_NO_ERROR)
+    {
+        fprintf(stderr, "\nInternal program error, please contact the author!\n");
+        exit(2);
+    }
 
     ProcessCommandline(argc, argv);
     switch (*argv[1])

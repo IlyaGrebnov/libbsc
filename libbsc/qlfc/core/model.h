@@ -242,86 +242,95 @@ public:
     } Run;
 };
 
-static void bsc_init_model(BscQlfcModel * model)
+BscQlfcModel static_model;
+
+static int bsc_qlfc_init_static_model()
 {
     for (int mixer = 0; mixer < ALPHABET_SIZE; ++mixer)
     {
-        model->mixerOfRank[mixer].Init();
-        model->mixerOfRankEscape[mixer].Init();
-        model->mixerOfRun[mixer].Init();
+        static_model.mixerOfRank[mixer].Init();
+        static_model.mixerOfRankEscape[mixer].Init();
+        static_model.mixerOfRun[mixer].Init();
     }
     for (int bit = 0; bit < 8; ++bit)
     {
-        model->mixerOfRankMantissa[bit].Init();
+        static_model.mixerOfRankMantissa[bit].Init();
         for (int context = 0; context < 8; ++context)
-            model->mixerOfRankExponent[context][bit].Init();
+            static_model.mixerOfRankExponent[context][bit].Init();
     }
     for (int bit = 0; bit < 32; ++bit)
     {
-        model->mixerOfRunMantissa[bit].Init();
+        static_model.mixerOfRunMantissa[bit].Init();
         for (int context = 0; context < 32; ++context)
-            model->mixerOfRunExponent[context][bit].Init();
+            static_model.mixerOfRunExponent[context][bit].Init();
     }
     {
-        model->Rank.StaticModel = 2048;
+        static_model.Rank.StaticModel = 2048;
         for (int state = 0; state < ALPHABET_SIZE; ++state)
-            model->Rank.StateModel[state] = 2048;
+            static_model.Rank.StateModel[state] = 2048;
         for (int context = 0; context < ALPHABET_SIZE; ++context)
-            model->Rank.CharModel[context] = 2048;
+            static_model.Rank.CharModel[context] = 2048;
     }
     for (int bit = 0; bit < 8; ++bit)
     {
-        model->Rank.Exponent.StaticModel[bit] = 2048;
+        static_model.Rank.Exponent.StaticModel[bit] = 2048;
         for (int state = 0; state < ALPHABET_SIZE; ++state)
-            model->Rank.Exponent.StateModel[state][bit] = 2048;
+            static_model.Rank.Exponent.StateModel[state][bit] = 2048;
         for (int context = 0; context < ALPHABET_SIZE; ++context)
-            model->Rank.Exponent.CharModel[context][bit] = 2048;
+            static_model.Rank.Exponent.CharModel[context][bit] = 2048;
     }
     for (int bitRankSize = 0; bitRankSize < 8; ++bitRankSize)
     {
         for (int bit = 0; bit < ALPHABET_SIZE; ++bit)
         {
-            model->Rank.Mantissa[bitRankSize].StaticModel[bit] = 2048;
+            static_model.Rank.Mantissa[bitRankSize].StaticModel[bit] = 2048;
             for (int state = 0; state < ALPHABET_SIZE; ++state)
-                model->Rank.Mantissa[bitRankSize].StateModel[state][bit] = 2048;
+                static_model.Rank.Mantissa[bitRankSize].StateModel[state][bit] = 2048;
             for (int context = 0; context < ALPHABET_SIZE; ++context)
-                model->Rank.Mantissa[bitRankSize].CharModel[context][bit] = 2048;
+                static_model.Rank.Mantissa[bitRankSize].CharModel[context][bit] = 2048;
         }
     }
     for (int bit = 0; bit < ALPHABET_SIZE; ++bit)
     {
-        model->Rank.Escape.StaticModel[bit] = 2048;
+        static_model.Rank.Escape.StaticModel[bit] = 2048;
         for (int state = 0; state < ALPHABET_SIZE; ++state)
-            model->Rank.Escape.StateModel[state][bit] = 2048;
+            static_model.Rank.Escape.StateModel[state][bit] = 2048;
         for (int context = 0; context < ALPHABET_SIZE; ++context)
-            model->Rank.Escape.CharModel[context][bit] = 2048;
+            static_model.Rank.Escape.CharModel[context][bit] = 2048;
     }
     {
-        model->Run.StaticModel = 2048;
+        static_model.Run.StaticModel = 2048;
         for (int state = 0; state < ALPHABET_SIZE; ++state)
-            model->Run.StateModel[state] = 2048;
+            static_model.Run.StateModel[state] = 2048;
         for (int context = 0; context < ALPHABET_SIZE; ++context)
-            model->Run.CharModel[context] = 2048;
+            static_model.Run.CharModel[context] = 2048;
     }
     for (int bit = 0; bit < 32; ++bit)
     {
-        model->Run.Exponent.StaticModel[bit] = 2048;
+        static_model.Run.Exponent.StaticModel[bit] = 2048;
         for (int state = 0; state < ALPHABET_SIZE; ++state)
-            model->Run.Exponent.StateModel[state][bit] = 2048;
+            static_model.Run.Exponent.StateModel[state][bit] = 2048;
         for (int context = 0; context < ALPHABET_SIZE; ++context)
-            model->Run.Exponent.CharModel[context][bit] = 2048;
+            static_model.Run.Exponent.CharModel[context][bit] = 2048;
     }
     for (int bitRunSize = 0; bitRunSize < 32; ++bitRunSize)
     {
         for (int bit = 0; bit < 32; ++bit)
         {
-            model->Run.Mantissa[bitRunSize].StaticModel[bit] = 2048;
+            static_model.Run.Mantissa[bitRunSize].StaticModel[bit] = 2048;
             for (int state = 0; state < ALPHABET_SIZE; ++state)
-                model->Run.Mantissa[bitRunSize].StateModel[state][bit] = 2048;
+                static_model.Run.Mantissa[bitRunSize].StateModel[state][bit] = 2048;
             for (int context = 0; context < ALPHABET_SIZE; ++context)
-                model->Run.Mantissa[bitRunSize].CharModel[context][bit] = 2048;
+                static_model.Run.Mantissa[bitRunSize].CharModel[context][bit] = 2048;
         }
     }
+
+    return LIBBSC_NO_ERROR;
+}
+
+INLINE void bsc_qlfc_init_model(BscQlfcModel * model)
+{
+    memcpy(model, &static_model, sizeof(BscQlfcModel));
 }
 
 #endif
