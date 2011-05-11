@@ -1,6 +1,6 @@
 SHELL = /bin/sh
 
-CC = gcc
+CC = g++
 AR = ar
 RANLIB = ranlib
 
@@ -14,8 +14,9 @@ CFLAGS = -g -Wall -Ilibbsc
 # the author be liable for any lost revenue or profits or other special,
 # indirect and consequential damages.
 
-# Sort Transform is disabled by default and can be enabled by defining the 
+# Sort Transform is disabled by default and can be enabled by defining the
 # preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
+
 #CFLAGS += -DLIBBSC_SORT_TRANSFORM_SUPPORT
 
 # Comment out CFLAGS line below for compatability mode for 32bit file sizes
@@ -31,9 +32,6 @@ CFLAGS += -fopenmp
 
 # Comment out CFLAGS line below to enable debug output
 CFLAGS += -DNDEBUG
-
-# External libraries
-LDFLAGS = -lstdc++
 
 # Where you want bsc installed when you do 'make install'
 PREFIX = /usr
@@ -52,7 +50,7 @@ OBJS = preprocessing.o \
 all: libbsc.a bsc
 
 bsc: libbsc.a bsc.cpp
-	$(CC) $(CFLAGS) $(LDFLAGS) bsc.cpp -o bsc -L. -lbsc
+	$(CC) $(CFLAGS) bsc.cpp -o bsc -L. -lbsc
 
 libbsc.a: $(OBJS)
 	rm -f libbsc.a
@@ -74,7 +72,7 @@ install: libbsc.a bsc
 	cp -f libbsc.a $(PREFIX)/lib
 	chmod a+r $(PREFIX)/lib/libbsc.a
 
-clean: 
+clean:
 	rm -f *.o libbsc.a bsc
 
 preprocessing.o: libbsc/filters/preprocessing.cpp

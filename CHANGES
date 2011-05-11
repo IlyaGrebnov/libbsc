@@ -1,3 +1,6 @@
+Changes in 2.4.5 (January 3, 2011)
+- Improved performance of reverse BWT and ST algorithms
+
 Changes in 2.4.0 (October 18, 2010)
 - Improved performance of reverse BWT and ST algorithms
 

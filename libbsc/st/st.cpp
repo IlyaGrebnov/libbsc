@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2010 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -40,7 +40,7 @@ copyrights, trade secrets or any patents by this software. In no event will
 the author be liable for any lost revenue or profits or other special,
 indirect and consequential damages.
 
-Sort Transform is disabled by default and can be enabled by defining the 
+Sort Transform is disabled by default and can be enabled by defining the
 preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 --*/
@@ -413,7 +413,6 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
     };
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
-
 
 static int bsc_st4_transform_parallel(unsigned char * T, unsigned int * P, int * bucket, int n)
 {
@@ -903,10 +902,19 @@ static bool bsc_unst_sort(unsigned char * T, unsigned int * P, unsigned int * co
             if (count[c] >= 0x800000) failBack = true;
 
             sum += count[c]; count[c] = sum - count[c];
-            for (int i = count[c]; i < sum; ++i)
+            if ((int)count[c] != sum)
             {
-                bucket[(T[i] << 8) | c]++;
+                unsigned int * bucket_p = &bucket[c << 8];
+                for (int i = count[c]; i < sum; ++i) bucket_p[T[i]]++;
             }
+        }
+    }
+
+    for (int c = 0; c < ALPHABET_SIZE; ++c)
+    {
+        for (int d = 0; d < c; ++d)
+        {
+            int t = bucket[(d << 8) | c]; bucket[(d << 8) | c] = bucket[(c << 8) | d]; bucket[(c << 8) | d] = t;
         }
     }
 
@@ -1039,26 +1047,19 @@ static void bsc_unst_reconstruct_case2(unsigned char * T, unsigned int * P, unsi
     }
 }
 
-static INLINE int bsc_unst_binarysearch(unsigned int * p, unsigned int v)
+static INLINE int bsc_unst_search(int index, unsigned int * p, unsigned int v)
 {
-    int index = 0;
-
-    if (p[index + 128] <= v) index += 128;
-    if (p[index +  64] <= v) index +=  64;
-    if (p[index +  32] <= v) index +=  32;
-    if (p[index +  16] <= v) index +=  16;
-    if (p[index +   8] <= v) index +=   8;
-    if (p[index +   4] <= v) index +=   4;
-    if (p[index +   2] <= v) index +=   2;
-    if (p[index +   1] <= v) index +=   1;
-
+    while (p[index + 1] <= v) index++;
     return index;
 }
 
+#define ST_NUM_FASTBITS (10)
+
 static void bsc_unst_reconstruct_case3(unsigned char * T, unsigned int * P, unsigned int * count, int n, int start)
 {
-    unsigned int index[ALPHABET_SIZE];
-             int group[ALPHABET_SIZE];
+    unsigned char   fastbits[1 << ST_NUM_FASTBITS];
+    unsigned int    index[ALPHABET_SIZE + 1];
+             int    group[ALPHABET_SIZE];
 
     memcpy(index, count, ALPHABET_SIZE * sizeof(unsigned int));
     memset(group, 0xff, ALPHABET_SIZE * sizeof(int));
@@ -1080,27 +1081,19 @@ static void bsc_unst_reconstruct_case3(unsigned char * T, unsigned int * P, unsi
     }
 
     {
-        unsigned char   L[ALPHABET_SIZE];
-        int             d = 0;
+        int shift = 0; while (((n - 1) >> shift) >= (1 << ST_NUM_FASTBITS)) shift++;
 
         {
             memcpy(index, count, ALPHABET_SIZE * sizeof(unsigned int));
 
-            for (int sum = n, i = ALPHABET_SIZE - 1; i >= 0; --i)
+            index[ALPHABET_SIZE] = n;
+            for (int c = 0, v = 0; c < ALPHABET_SIZE; ++c)
             {
-                index[i] = sum - index[i]; sum -= index[i];
-            }
-            for (int sum = 0, c = 0; c < ALPHABET_SIZE; ++c)
-            {
-                int p = index[c];
-                if (p > 0)
+                if (index[c] != index[c + 1])
                 {
-                    L[d++] = (unsigned char)c;
-                    index[c] = sum; sum += p;
+                    for (; v <= (int)((index[c + 1] - 1) >> shift); ++v) fastbits[v] = c;
                 }
             }
-            for (int c = 0; c < d; ++c) index[c] = index[L[c]];
-            for (int c = d; c < ALPHABET_SIZE; ++c) index[c] = n + 2;
         }
 
         if (P[start] & 0x80000000)
@@ -1108,41 +1101,20 @@ static void bsc_unst_reconstruct_case3(unsigned char * T, unsigned int * P, unsi
             start = P[start] & 0x7fffffff;
         }
 
-        T[0] = L[bsc_unst_binarysearch(index, start)];
-
+        T[0] = bsc_unst_search(fastbits[start >> shift], index, start);
         P[start]--; start = P[start] + 1;
 
-        if (d != ALPHABET_SIZE)
+        for (int p = start, i = n - 1; i >= 1; --i)
         {
-            for (int p = start, i = n - 1; i >= 1; --i)
+            unsigned int u = P[p];
+            if (u & 0x80000000)
             {
-                unsigned int u = P[p];
-                if (u & 0x80000000)
-                {
-                    p = u & 0x7fffffff;
-                    u = P[p];
-                }
-
-                T[i] = L[bsc_unst_binarysearch(index, p)];
-
-                P[p]--; p = u;
+                p = u & 0x7fffffff;
+                u = P[p];
             }
-        }
-        else
-        {
-            for (int p = start, i = n - 1; i >= 1; --i)
-            {
-                unsigned int u = P[p];
-                if (u & 0x80000000)
-                {
-                    p = u & 0x7fffffff;
-                    u = P[p];
-                }
 
-                T[i] = bsc_unst_binarysearch(index, p);
-
-                P[p]--; p = u;
-            }
+            T[i] = bsc_unst_search(fastbits[p >> shift], index, p);
+            P[p]--; p = u;
         }
     }
 }

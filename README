@@ -10,7 +10,7 @@ block-sorting data compression algorithms.
 libbsc is a library based on bsc, it uses the same algorithms
 as bsc and enables you to compress memory blocks.
 
-Copyright (c) 2009-2010 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
 
 See the bsc and libbsc web site:
   http://libbsc.com/ for more information.
@@ -27,7 +27,7 @@ copyrights, trade secrets or any patents by this software. In no event will
 the author be liable for any lost revenue or profits or other special,
 indirect and consequential damages.
 
-Sort Transform is disabled by default and can be enabled by defining the 
+Sort Transform is disabled by default and can be enabled by defining the
 preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 

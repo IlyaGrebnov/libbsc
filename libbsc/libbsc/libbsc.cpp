@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2010 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -40,7 +40,7 @@ copyrights, trade secrets or any patents by this software. In no event will
 the author be liable for any lost revenue or profits or other special,
 indirect and consequential damages.
 
-Sort Transform is disabled by default and can be enabled by defining the 
+Sort Transform is disabled by default and can be enabled by defining the
 preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 --*/
@@ -83,7 +83,7 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
         case LIBBSC_BLOCKSORTER_ST5 : mode = LIBBSC_BLOCKSORTER_ST5; break;
         case LIBBSC_BLOCKSORTER_ST4 : mode = LIBBSC_BLOCKSORTER_ST4; break;
         case LIBBSC_BLOCKSORTER_ST3 : mode = LIBBSC_BLOCKSORTER_ST3; break;
-        
+
 #endif
 
         case LIBBSC_BLOCKSORTER_BWT : mode = LIBBSC_BLOCKSORTER_BWT; break;
@@ -142,9 +142,9 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
         case LIBBSC_BLOCKSORTER_ST3 : index = bsc_st3_encode(data, lzSize, features); break;
         case LIBBSC_BLOCKSORTER_ST4 : index = bsc_st4_encode(data, lzSize, features); break;
         case LIBBSC_BLOCKSORTER_ST5 : index = bsc_st5_encode(data, lzSize, features); break;
-        
-#endif        
-        
+
+#endif
+
         case LIBBSC_BLOCKSORTER_BWT : index = bsc_bwt_encode(data, lzSize, &num_indexes, indexes, features); break;
         default : return LIBBSC_BAD_PARAMETER;
     }
@@ -200,7 +200,7 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
     {
 
 #if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
-    
+
         case LIBBSC_BLOCKSORTER_ST5 : mode = LIBBSC_BLOCKSORTER_ST5; break;
         case LIBBSC_BLOCKSORTER_ST4 : mode = LIBBSC_BLOCKSORTER_ST4; break;
         case LIBBSC_BLOCKSORTER_ST3 : mode = LIBBSC_BLOCKSORTER_ST3; break;
@@ -253,13 +253,13 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
     {
 
 #if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
-    
+
         case LIBBSC_BLOCKSORTER_ST3 : index = bsc_st3_encode(output, lzSize, features); break;
         case LIBBSC_BLOCKSORTER_ST4 : index = bsc_st4_encode(output, lzSize, features); break;
         case LIBBSC_BLOCKSORTER_ST5 : index = bsc_st5_encode(output, lzSize, features); break;
-      
-#endif        
-        
+
+#endif
+
         case LIBBSC_BLOCKSORTER_BWT : index = bsc_bwt_encode(output, lzSize, &num_indexes, indexes, features); break;
         default : return LIBBSC_BAD_PARAMETER;
     }

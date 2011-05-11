@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2010 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -54,8 +54,10 @@ int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * 
     return index;
 }
 
-static bool bsc_unbwt_sort(unsigned char * T, unsigned int * P, unsigned int * bucket, int n, int index)
+static int bsc_unbwt_mergedTL_sequential(unsigned char * T, unsigned int * P, int n, int index)
 {
+    unsigned int bucket[ALPHABET_SIZE];
+
     memset(bucket, 0, ALPHABET_SIZE * sizeof(unsigned int));
 
     for (int i = 0; i < index; ++i)
@@ -69,96 +71,142 @@ static bool bsc_unbwt_sort(unsigned char * T, unsigned int * P, unsigned int * b
         P[i + 1] = ((bucket[c]++) << 8) | c;
     }
 
-    bool failBack = false;
     for (int sum = 1, i = 0; i < ALPHABET_SIZE; ++i)
     {
-        if (bucket[i] >= 0x1000000) failBack = true;
         sum += bucket[i]; bucket[i] = sum - bucket[i];
     }
 
-    return failBack;
+    for (int p = 0, i = n - 1; i >= 0; --i)
+    {
+        unsigned int  u = P[p];
+        unsigned char c = u & 0xff;
+        T[i] = c; p = (u >> 8) + bucket[c];
+    }
+
+    return LIBBSC_NO_ERROR;
 }
 
-static INLINE int bsc_unbwt_binarysearch(unsigned int * p, unsigned int v)
+#define BWT_NUM_FASTBITS (17)
+
+static int bsc_unbwt_biPSI_sequential(unsigned char * T, unsigned int * P, int n, int index)
 {
-    int index = 0;
+    if (int * bucket = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+    {
+        if (unsigned short * fastbits = (unsigned short *)bsc_malloc((1 + (1 << BWT_NUM_FASTBITS)) * sizeof(unsigned short)))
+        {
+            int count[ALPHABET_SIZE];
 
-    if (p[index + 127] <= v) index += 128;
-    if (p[index +  63] <= v) index +=  64;
-    if (p[index +  31] <= v) index +=  32;
-    if (p[index +  15] <= v) index +=  16;
-    if (p[index +   7] <= v) index +=   8;
-    if (p[index +   3] <= v) index +=   4;
-    if (p[index +   1] <= v) index +=   2;
-    if (p[index +   0] <= v) index +=   1;
+            memset(count , 0, ALPHABET_SIZE * sizeof(int));
+            memset(bucket, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
 
-    return index;
+            int shift = 0; while ((n >> shift) > (1 << BWT_NUM_FASTBITS)) shift++;
+
+            for (int i = 0; i < n; ++i) count[T[i]]++;
+
+            for (int sum = 1, c = 0; c < ALPHABET_SIZE; ++c)
+            {
+                sum += count[c]; count[c] = sum - count[c];
+                if (count[c] != sum)
+                {
+                    int * bucket_p = &bucket[c << 8];
+
+                    int hi = index; if (sum < hi) hi = sum;
+                    for (int i = count[c]; i < hi; ++i) bucket_p[T[i]]++;
+
+                    int lo = index + 1; if (count[c] > lo) lo = count[c];
+                    for (int i = lo; i < sum; ++i) bucket_p[T[i - 1]]++;
+                }
+            }
+
+            int lastc = T[0];
+            for (int v = 0, sum = 1, c = 0; c < ALPHABET_SIZE; ++c)
+            {
+                if (c == lastc) sum++;
+
+                int * bucket_p = &bucket[c];
+                for (int d = 0; d < ALPHABET_SIZE; ++d)
+                {
+                    sum += bucket_p[d << 8]; bucket_p[d << 8] = sum - bucket_p[d << 8];
+                    if (bucket_p[d << 8] != sum)
+                    {
+                        for (; v <= ((sum - 1) >> shift); ++v) fastbits[v] = (c << 8) | d;
+                    }
+                }
+            }
+
+            for (int i = 0; i < index; ++i)
+            {
+                unsigned char c = T[i];
+                int           p = count[c]++;
+
+                if (p < index) P[bucket[(c << 8) | T[p    ]]++] = i; else
+                if (p > index) P[bucket[(c << 8) | T[p - 1]]++] = i;
+            }
+
+            for (int i = index; i < n; ++i)
+            {
+                unsigned char c = T[i];
+                int           p = count[c]++;
+
+                if (p < index) P[bucket[(c << 8) | T[p    ]]++] = i + 1; else
+                if (p > index) P[bucket[(c << 8) | T[p - 1]]++] = i + 1;
+            }
+
+            for (int c = 0; c < ALPHABET_SIZE; ++c)
+            {
+                for (int d = 0; d < c; ++d)
+                {
+                    int t = bucket[(d << 8) | c]; bucket[(d << 8) | c] = bucket[(c << 8) | d]; bucket[(c << 8) | d] = t;
+                }
+            }
+
+            for (int i = 1, p = index; i < n; i += 2)
+            {
+                int c = fastbits[p >> shift]; while (bucket[c] <= p) c++;
+                T[i - 1] = (unsigned char)(c >> 8); T[i] = (unsigned char)(c & 0xff);
+                p = P[p];
+            }
+
+            T[n - 1] = (unsigned char)lastc;
+
+            bsc_free(fastbits); bsc_free(bucket);
+            return LIBBSC_NO_ERROR;
+        }
+        bsc_free(bucket);
+    };
+    return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
-static void bsc_unbwt_reconstruct_sequential(unsigned char * T, unsigned int * P, unsigned int * bucket, int n, int index, bool failBack)
+static int bsc_unbwt_reconstruct_sequential(unsigned char * T, unsigned int * P, int n, int index)
 {
-    if (!failBack)
-    {
-        for (int p = 0, i = n - 1; i >= 0; --i)
-        {
-            unsigned int  u = P[p];
-            unsigned char c = u & 0xff;
-            T[i] = c; p = (u >> 8) + bucket[c];
-        }
-    }
-    else
-    {
-        unsigned char L[ALPHABET_SIZE];
-        for (int sum = n + 1, i = ALPHABET_SIZE - 1; i >= 0; --i)
-        {
-            bucket[i] = sum - bucket[i]; sum -= bucket[i];
-        }
-        int d = 0;
-        for (int c = 0, sum = 1; c < ALPHABET_SIZE; ++c)
-        {
-            int p = bucket[c];
-            if (p > 0)
-            {
-                L[d++] = (unsigned char)c;
-                bucket[c] = sum; sum += p;
-            }
-        }
-        for (int i = 0; i < index; ++i)
-        {
-            unsigned char c = T[i];
-            P[bucket[c]++] = i;
-        }
-        for (int i = index; i < n; ++i)
-        {
-            unsigned char c = T[i];
-            P[bucket[c]++] = i + 1;
-        }
-        for (int c = 0; c < d; ++c) bucket[c] = bucket[L[c]];
-        for (int c = d; c < ALPHABET_SIZE; ++c) bucket[c] = n + 2;
-
-        if (d != ALPHABET_SIZE)
-        {
-            for (int i = 0, p = index; i < n; ++i)
-            {
-                T[i] = L[bsc_unbwt_binarysearch(bucket, p)];
-                p = P[p];
-            }
-        }
-        else
-        {
-            for (int i = 0, p = index; i < n; ++i)
-            {
-                T[i] = bsc_unbwt_binarysearch(bucket, p);
-                p = P[p];
-            }
-        }
-    }
+    if (n < 3 * 1024 * 1024) return bsc_unbwt_mergedTL_sequential(T, P, n, index);
+    return bsc_unbwt_biPSI_sequential(T, P, n, index);
 }
 
 #ifdef _OPENMP
 
-static void bsc_unbwt_reconstruct_parallel(unsigned char * T, unsigned int * P, unsigned int * bucket, int n, int index, int * indexes, bool failBack)
+static int bsc_unbwt_mergedTL_parallel(unsigned char * T, unsigned int * P, int n, int index, int * indexes)
 {
+    unsigned int bucket[ALPHABET_SIZE];
+
+    memset(bucket, 0, ALPHABET_SIZE * sizeof(unsigned int));
+
+    for (int i = 0; i < index; ++i)
+    {
+        unsigned char c = T[i];
+        P[i] = ((bucket[c]++) << 8) | c;
+    }
+    for (int i = index; i < n; ++i)
+    {
+        unsigned char c = T[i];
+        P[i + 1] = ((bucket[c]++) << 8) | c;
+    }
+
+    for (int sum = 1, i = 0; i < ALPHABET_SIZE; ++i)
+    {
+        sum += bucket[i]; bucket[i] = sum - bucket[i];
+    }
+
     int mod = n / 8;
     {
         mod |= mod >> 1;  mod |= mod >> 2;
@@ -168,78 +216,134 @@ static void bsc_unbwt_reconstruct_parallel(unsigned char * T, unsigned int * P, 
 
     int nBlocks = 1 + (n - 1) / mod;
 
-    if (!failBack)
+    #pragma omp parallel for default(shared) schedule(dynamic, 1)
+    for (int blockId = 0; blockId < nBlocks; ++blockId)
     {
-        #pragma omp parallel for default(shared) schedule(dynamic, 1)
-        for (int blockId = 0; blockId < nBlocks; ++blockId)
-        {
-            int p           = (blockId < nBlocks - 1) ? indexes[blockId] + 1    : 0;
-            int blockStart  = (blockId < nBlocks - 1) ? mod * blockId + mod - 1 : n - 1;
-            int blockEnd    = mod * blockId;
+        int p           = (blockId < nBlocks - 1) ? indexes[blockId] + 1    : 0;
+        int blockStart  = (blockId < nBlocks - 1) ? mod * blockId + mod - 1 : n - 1;
+        int blockEnd    = mod * blockId;
 
-            for (int i = blockStart; i >= blockEnd; --i)
-            {
-                unsigned int  u = P[p];
-                unsigned char c = u & 0xff;
-                T[i] = c; p = (u >> 8) + bucket[c];
-            }
+        for (int i = blockStart; i >= blockEnd; --i)
+        {
+            unsigned int  u = P[p];
+            unsigned char c = u & 0xff;
+            T[i] = c; p = (u >> 8) + bucket[c];
         }
     }
-    else
+
+    return LIBBSC_NO_ERROR;
+}
+
+static int bsc_unbwt_biPSI_parallel(unsigned char * T, unsigned int * P, int n, int index, int * indexes)
+{
+    if (int * bucket = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
-        unsigned char L[ALPHABET_SIZE];
-        for (int sum = n + 1, i = ALPHABET_SIZE - 1; i >= 0; --i)
+        if (unsigned short * fastbits = (unsigned short *)bsc_malloc((1 + (1 << BWT_NUM_FASTBITS)) * sizeof(unsigned short)))
         {
-            bucket[i] = sum - bucket[i]; sum -= bucket[i];
-        }
-        int d = 0;
-        for (int c = 0, sum = 1; c < ALPHABET_SIZE; ++c)
-        {
-            int p = bucket[c];
-            if (p > 0)
-            {
-                L[d++] = (unsigned char)c;
-                bucket[c] = sum; sum += p;
-            }
-        }
-        for (int i = 0; i < index; ++i)
-        {
-            unsigned char c = T[i];
-            P[bucket[c]++] = i;
-        }
-        for (int i = index; i < n; ++i)
-        {
-            unsigned char c = T[i];
-            P[bucket[c]++] = i + 1;
-        }
-        for (int c = 0; c < d; ++c) bucket[c] = bucket[L[c]];
-        for (int c = d; c < ALPHABET_SIZE; ++c) bucket[c] = n + 2;
+            int count[ALPHABET_SIZE];
 
-        #pragma omp parallel for default(shared) schedule(dynamic, 1)
-        for (int blockId = 0; blockId < nBlocks; ++blockId)
-        {
-            int p           = (blockId > 0          ) ? indexes[blockId - 1] + 1    : index;
-            int blockEnd    = (blockId < nBlocks - 1) ? mod * blockId + mod         : n;
-            int blockStart  = mod * blockId;
+            memset(count , 0, ALPHABET_SIZE * sizeof(int));
+            memset(bucket, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
 
-            if (d != ALPHABET_SIZE)
+            int shift = 0; while ((n >> shift) > (1 << BWT_NUM_FASTBITS)) shift++;
+
+            for (int i = 0; i < n; ++i) count[T[i]]++;
+
+            for (int sum = 1, c = 0; c < ALPHABET_SIZE; ++c)
             {
-                for (int i = blockStart; i < blockEnd; ++i)
+                sum += count[c]; count[c] = sum - count[c];
+                if (count[c] != sum)
                 {
-                    T[i] = L[bsc_unbwt_binarysearch(bucket, p)];
+                    int * bucket_p = &bucket[c << 8];
+
+                    int hi = index; if (sum < hi) hi = sum;
+                    for (int i = count[c]; i < hi; ++i) bucket_p[T[i]]++;
+
+                    int lo = index + 1; if (count[c] > lo) lo = count[c];
+                    for (int i = lo; i < sum; ++i) bucket_p[T[i - 1]]++;
+                }
+            }
+
+            int lastc = T[0];
+            for (int v = 0, sum = 1, c = 0; c < ALPHABET_SIZE; ++c)
+            {
+                if (c == lastc) sum++;
+
+                int * bucket_p = &bucket[c];
+                for (int d = 0; d < ALPHABET_SIZE; ++d)
+                {
+                    sum += bucket_p[d << 8]; bucket_p[d << 8] = sum - bucket_p[d << 8];
+                    if (bucket_p[d << 8] != sum)
+                    {
+                        for (; v <= ((sum - 1) >> shift); ++v) fastbits[v] = (c << 8) | d;
+                    }
+                }
+            }
+
+            for (int i = 0; i < index; ++i)
+            {
+                unsigned char c = T[i];
+                int           p = count[c]++;
+
+                if (p < index) P[bucket[(c << 8) | T[p    ]]++] = i; else
+                if (p > index) P[bucket[(c << 8) | T[p - 1]]++] = i;
+            }
+
+            for (int i = index; i < n; ++i)
+            {
+                unsigned char c = T[i];
+                int           p = count[c]++;
+
+                if (p < index) P[bucket[(c << 8) | T[p    ]]++] = i + 1; else
+                if (p > index) P[bucket[(c << 8) | T[p - 1]]++] = i + 1;
+            }
+
+            for (int c = 0; c < ALPHABET_SIZE; ++c)
+            {
+                for (int d = 0; d < c; ++d)
+                {
+                    int t = bucket[(d << 8) | c]; bucket[(d << 8) | c] = bucket[(c << 8) | d]; bucket[(c << 8) | d] = t;
+                }
+            }
+
+            int mod = n / 8;
+            {
+                mod |= mod >> 1;  mod |= mod >> 2;
+                mod |= mod >> 4;  mod |= mod >> 8;
+                mod |= mod >> 16; mod >>= 1; mod++;
+            }
+
+            int nBlocks = 1 + (n - 1) / mod;
+
+            #pragma omp parallel for default(shared) schedule(dynamic, 1)
+            for (int blockId = 0; blockId < nBlocks; ++blockId)
+            {
+                int p           = (blockId > 0          ) ? indexes[blockId - 1] + 1    : index;
+                int blockEnd    = (blockId < nBlocks - 1) ? mod * blockId + mod         : n;
+                int blockStart  = mod * blockId;
+
+                if (blockEnd != n) blockEnd++; else T[n - 1] = (unsigned char)lastc;
+
+                for (int i = blockStart + 1; i < blockEnd; i += 2)
+                {
+                    int c = fastbits[p >> shift]; while (bucket[c] <= p) c++;
+                    T[i - 1] = (unsigned char)(c >> 8); T[i] = (unsigned char)(c & 0xff);
                     p = P[p];
                 }
             }
-            else
-            {
-                for (int i = blockStart; i < blockEnd; ++i)
-                {
-                    T[i] = bsc_unbwt_binarysearch(bucket, p);
-                    p = P[p];
-                }
-            }
+
+            bsc_free(fastbits); bsc_free(bucket);
+            return LIBBSC_NO_ERROR;
         }
-    }
+        bsc_free(bucket);
+    };
+    return LIBBSC_NOT_ENOUGH_MEMORY;
+}
+
+static int bsc_unbwt_reconstruct_parallel(unsigned char * T, unsigned int * P, int n, int index, int * indexes)
+{
+    if (n < 3 * 1024 * 1024) return bsc_unbwt_mergedTL_parallel(T, P, n, index, indexes);
+    return bsc_unbwt_biPSI_parallel(T, P, n, index, indexes);
 }
 
 #endif
@@ -256,9 +360,7 @@ int bsc_bwt_decode(unsigned char * T, int n, int index, unsigned char num_indexe
     }
     if (unsigned int * P = (unsigned int *)bsc_malloc((n + 1) * sizeof(unsigned int)))
     {
-        unsigned int bucket[ALPHABET_SIZE];
-
-        bool failBack = bsc_unbwt_sort(T, P, bucket, n, index);
+        int result = LIBBSC_NO_ERROR;
 
 #ifdef _OPENMP
 
@@ -271,18 +373,18 @@ int bsc_bwt_decode(unsigned char * T, int n, int index, unsigned char num_indexe
 
         if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024) && (num_indexes == (unsigned char)((n - 1) / (mod + 1))) && (indexes != NULL))
         {
-            bsc_unbwt_reconstruct_parallel(T, P, bucket, n, index, indexes, failBack);
+            result = bsc_unbwt_reconstruct_parallel(T, P, n, index, indexes);
         }
         else
 
 #endif
 
         {
-            bsc_unbwt_reconstruct_sequential(T, P, bucket, n, index, failBack);
+            result = bsc_unbwt_reconstruct_sequential(T, P, n, index);
         }
 
         bsc_free(P);
-        return LIBBSC_NO_ERROR;
+        return result;
     };
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }

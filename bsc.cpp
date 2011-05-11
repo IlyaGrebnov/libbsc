@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2010 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -40,7 +40,7 @@ copyrights, trade secrets or any patents by this software. In no event will
 the author be liable for any lost revenue or profits or other special,
 indirect and consequential damages.
 
-Sort Transform is disabled by default and can be enabled by defining the 
+Sort Transform is disabled by default and can be enabled by defining the
 preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 --*/
@@ -831,8 +831,8 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.4.0. 18 October 2010.\n");
-    fprintf(stdout, "Copyright (c) 2009-2010 Ilya Grebnov <Ilya.Grebnov@libbsc.com>.\n\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.4.5. 3 January 2011.\n");
+    fprintf(stdout, "Copyright (c) 2009-2011 Ilya Grebnov <Ilya.Grebnov@libbsc.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)
 
