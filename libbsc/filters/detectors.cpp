@@ -191,7 +191,7 @@ int bsc_detect_segments_parallel(BscBlockModel * model0, BscBlockModel * model1,
                 if (threadId == 0)
                 {
                     long long leftEntropy = 0, rightEntropy = globalBestEntropy;
-                    for (int i = 0; i < median; ++i)
+                    for (int context = 0, i = 0; i < median; ++i)
                     {
                         if (rightEntropy + leftEntropy < localBestEntropy)
                         {
@@ -199,13 +199,14 @@ int bsc_detect_segments_parallel(BscBlockModel * model0, BscBlockModel * model1,
                             localBlockSize   = i;
                         }
 
-                        unsigned char   symbol  = input[i];
-                        int             context = (unsigned char)((input[i - 2] << 5) ^ input[i - 1]);
+                        unsigned char symbol = input[i];
 
                         rightEntropy    += bsc_delta(--model0->contexts[context].rightFrequencies[symbol]);
                         leftEntropy     -= bsc_delta(model0->contexts[context].leftFrequencies[symbol]++);
                         rightEntropy    -= bsc_delta(--model0->contexts[context].rightCount);
                         leftEntropy     += bsc_delta(model0->contexts[context].leftCount++);
+
+                        context = (unsigned char)((context << 5) ^ symbol);
                     }
                 }
                 else

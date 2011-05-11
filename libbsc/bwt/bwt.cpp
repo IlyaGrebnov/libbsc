@@ -160,7 +160,7 @@ static int bsc_unbwt_biPSI_sequential(unsigned char * T, unsigned int * P, int n
                 }
             }
 
-            for (int i = 1, p = index; i < n; i += 2)
+            for (int p = index, i = 1; i < n; i += 2)
             {
                 int c = fastbits[p >> shift]; while (bucket[c] <= p) c++;
                 T[i - 1] = (unsigned char)(c >> 8); T[i] = (unsigned char)(c & 0xff);

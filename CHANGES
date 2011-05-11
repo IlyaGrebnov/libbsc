@@ -1,3 +1,6 @@
+Changes in 2.6.1 (May 4, 2011)
+- Fixed bug in segmentation algorithm
+
 Changes in 2.6.0 (April 30, 2011)
 - Added Sort Transform of order 6
 

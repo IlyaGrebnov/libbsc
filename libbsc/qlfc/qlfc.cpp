@@ -68,7 +68,7 @@ unsigned char * bsc_qlfc_transform(const unsigned char * input, unsigned char * 
     for (int i = n - 1; i >= 0;)
     {
         unsigned char currentChar = input[i--];
-        for(; (i >= 0) && (input[i] == currentChar); --i) ;
+        for (; (i >= 0) && (input[i] == currentChar); --i) ;
 
         unsigned char previousChar = MTFTable[0], rank = 1; MTFTable[0] = currentChar;
         while (true)
@@ -253,7 +253,7 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
                 staticPredictor = & model->Rank.Mantissa[bitRankSize].StaticModel[0];
                 mixer           = & model->mixerOfRankMantissa[bitRankSize];
 
-                for (int bit = bitRankSize - 1, context = 1; bit >= 0; --bit)
+                for (int context = 1, bit = bitRankSize - 1; bit >= 0; --bit)
                 {
                     if (rank & (1 << bit))
                     {
@@ -290,7 +290,7 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
             charPredictor   = & model->Rank.Escape.CharModel[currentChar][0];
             staticPredictor = & model->Rank.Escape.StaticModel[0];
 
-            for (int bit = maxRank, context = 1; bit >= 0; --bit)
+            for (int context = 1, bit = maxRank; bit >= 0; --bit)
             {
                 mixer = & model->mixerOfRankEscape[context];
 
@@ -388,7 +388,7 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
             staticPredictor = & model->Run.Mantissa[bitRunSize].StaticModel[0];
             mixer           = & model->mixerOfRunMantissa[bitRunSize];
 
-            for (int bit = bitRunSize - 1, context = 1; bit >= 0; --bit)
+            for (int context = 1, bit = bitRunSize - 1; bit >= 0; --bit)
             {
                 if (runSize & (1 << bit))
                 {
@@ -562,7 +562,7 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
                 charPredictor   = & model->Rank.Mantissa[bitRankSize].CharModel[currentChar][0];
                 staticPredictor = & model->Rank.Mantissa[bitRankSize].StaticModel[0];
 
-                for (int bit = bitRankSize - 1, context = 1; bit >= 0; --bit)
+                for (int context = 1, bit = bitRankSize - 1; bit >= 0; --bit)
                 {
                     int probability = (charPredictor[context] * F_RANK_MM_LR0 + statePredictor[context] * F_RANK_MM_LR1 + staticPredictor[context] * F_RANK_MM_LR2) >> 5;
 
@@ -593,7 +593,7 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
             charPredictor   = & model->Rank.Escape.CharModel[currentChar][0];
             staticPredictor = & model->Rank.Escape.StaticModel[0];
 
-            for (int bit = maxRank, context = 1; bit >= 0; --bit)
+            for (int context = 1, bit = maxRank; bit >= 0; --bit)
             {
                 int probability = (charPredictor[context] * F_RANK_PM_LR0 + statePredictor[context] * F_RANK_PM_LR1 + staticPredictor[context] * F_RANK_PM_LR2) >> 5;
 
@@ -678,7 +678,7 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
             charPredictor   = & model->Run.Mantissa[bitRunSize].CharModel[currentChar][0];
             staticPredictor = & model->Run.Mantissa[bitRunSize].StaticModel[0];
 
-            for (int bit = bitRunSize - 1, context = 1; bit >= 0; --bit)
+            for (int context = 1, bit = bitRunSize - 1; bit >= 0; --bit)
             {
                 int probability = (charPredictor[context] * F_RUN_MM_LR0 + statePredictor[context] * F_RUN_MM_LR1 + staticPredictor[context] * F_RUN_MM_LR2) >> 5;
                 if (runSize & (1 << bit))
@@ -867,7 +867,7 @@ int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, Bs
             staticPredictor = & model->Rank.Escape.StaticModel[0];
 
             rank = 0;
-            for (int bit = maxRank, context = 1; bit >= 0; --bit)
+            for (int context = 1, bit = maxRank; bit >= 0; --bit)
             {
                 mixer = & model->mixerOfRankEscape[context];
 
@@ -893,7 +893,7 @@ int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, Bs
         }
 
         {
-            for(int r = 0; r < rank; ++r)
+            for (int r = 0; r < rank; ++r)
             {
                 MTFTable[r] = MTFTable[r + 1];
             }
@@ -950,7 +950,7 @@ int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, Bs
             staticPredictor = & model->Run.Mantissa[bitRunSize].StaticModel[0];
             mixer           = & model->mixerOfRunMantissa[bitRunSize];
 
-            for (int bit = bitRunSize - 1, context = 1; bit >= 0; --bit)
+            for (int context = 1, bit = bitRunSize - 1; bit >= 0; --bit)
             {
                 if (coder.DecodeBit(mixer->Mixup(charPredictor[context], statePredictor[context], staticPredictor[context])))
                 {
@@ -1139,7 +1139,7 @@ int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, Bs
             staticPredictor = & model->Rank.Escape.StaticModel[0];
 
             rank = 0;
-            for (int bit = maxRank, context = 1; bit >= 0; --bit)
+            for (int context = 1, bit = maxRank; bit >= 0; --bit)
             {
                 if (coder.DecodeBit((charPredictor[context] * F_RANK_PM_LR0 + statePredictor[context] * F_RANK_PM_LR1 + staticPredictor[context] * F_RANK_PM_LR2) >> 5))
                 {
@@ -1161,7 +1161,7 @@ int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, Bs
         }
 
         {
-            for(int r = 0; r < rank; ++r)
+            for (int r = 0; r < rank; ++r)
             {
                 MTFTable[r] = MTFTable[r + 1];
             }
@@ -1212,7 +1212,7 @@ int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, Bs
             charPredictor   = & model->Run.Mantissa[bitRunSize].CharModel[currentChar][0];
             staticPredictor = & model->Run.Mantissa[bitRunSize].StaticModel[0];
 
-            for (int bit = bitRunSize - 1, context = 1; bit >= 0; --bit)
+            for (int context = 1, bit = bitRunSize - 1; bit >= 0; --bit)
             {
                 if (coder.DecodeBit((charPredictor[context] * F_RUN_MM_LR0 + statePredictor[context] * F_RUN_MM_LR1 + staticPredictor[context] * F_RUN_MM_LR2) >> 5))
                 {

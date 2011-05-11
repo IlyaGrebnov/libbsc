@@ -1293,7 +1293,7 @@ static INLINE int bsc_unst_search(int index, unsigned int * p, unsigned int v)
 static void bsc_unst_reconstruct_case3(unsigned char * T, unsigned int * P, unsigned int * count, int n, int start)
 {
     unsigned char   fastbits[1 << ST_NUM_FASTBITS];
-    unsigned int    index[ALPHABET_SIZE + 1];
+    unsigned int    index[ALPHABET_SIZE];
              int    group[ALPHABET_SIZE];
 
     memcpy(index, count, ALPHABET_SIZE * sizeof(unsigned int));
@@ -1321,12 +1321,12 @@ static void bsc_unst_reconstruct_case3(unsigned char * T, unsigned int * P, unsi
         {
             memcpy(index, count, ALPHABET_SIZE * sizeof(unsigned int));
 
-            index[ALPHABET_SIZE] = n;
-            for (int c = 0, v = 0; c < ALPHABET_SIZE; ++c)
+            for (int v = 0, c = 0; c < ALPHABET_SIZE; ++c)
             {
-                if (index[c] != index[c + 1])
+                int sum = (c + 1 < ALPHABET_SIZE) ? index[c + 1] : n;
+                if (index[c] != sum)
                 {
-                    for (; v <= (int)((index[c + 1] - 1) >> shift); ++v) fastbits[v] = c;
+                    for (; v <= (int)((sum - 1) >> shift); ++v) fastbits[v] = c;
                 }
             }
         }
