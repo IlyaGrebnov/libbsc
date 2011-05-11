@@ -1,3 +1,6 @@
+Changes in 2.6.0 (April 30, 2011)
+- Added Sort Transform of order 6
+
 Changes in 2.5.0 (March 20, 2011)
 - Some minor performance improvments
 - CRC32 replaced with Adler32

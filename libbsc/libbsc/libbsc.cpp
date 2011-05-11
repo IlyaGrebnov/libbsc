@@ -83,16 +83,17 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
     int mode = 0;
     switch (blockSorter)
     {
+        case LIBBSC_BLOCKSORTER_BWT : mode = LIBBSC_BLOCKSORTER_BWT; break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
+#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
 
-        case LIBBSC_BLOCKSORTER_ST5 : mode = LIBBSC_BLOCKSORTER_ST5; break;
-        case LIBBSC_BLOCKSORTER_ST4 : mode = LIBBSC_BLOCKSORTER_ST4; break;
         case LIBBSC_BLOCKSORTER_ST3 : mode = LIBBSC_BLOCKSORTER_ST3; break;
+        case LIBBSC_BLOCKSORTER_ST4 : mode = LIBBSC_BLOCKSORTER_ST4; break;
+        case LIBBSC_BLOCKSORTER_ST5 : mode = LIBBSC_BLOCKSORTER_ST5; break;
+        case LIBBSC_BLOCKSORTER_ST6 : mode = LIBBSC_BLOCKSORTER_ST6; break;
 
 #endif
 
-        case LIBBSC_BLOCKSORTER_BWT : mode = LIBBSC_BLOCKSORTER_BWT; break;
         default : return LIBBSC_BAD_PARAMETER;
     }
     if (lzpMinLen != 0 || lzpHashSize != 0)
@@ -142,16 +143,17 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
     int index = LIBBSC_BAD_PARAMETER; num_indexes = 0;
     switch (blockSorter)
     {
+        case LIBBSC_BLOCKSORTER_BWT : index = bsc_bwt_encode(data, lzSize, &num_indexes, indexes, features); break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
+#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
 
         case LIBBSC_BLOCKSORTER_ST3 : index = bsc_st3_encode(data, lzSize, features); break;
         case LIBBSC_BLOCKSORTER_ST4 : index = bsc_st4_encode(data, lzSize, features); break;
         case LIBBSC_BLOCKSORTER_ST5 : index = bsc_st5_encode(data, lzSize, features); break;
+        case LIBBSC_BLOCKSORTER_ST6 : index = bsc_st6_encode(data, lzSize, features); break;
 
 #endif
 
-        case LIBBSC_BLOCKSORTER_BWT : index = bsc_bwt_encode(data, lzSize, &num_indexes, indexes, features); break;
         default : return LIBBSC_BAD_PARAMETER;
     }
 
@@ -204,16 +206,17 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
     int mode = 0;
     switch (blockSorter)
     {
+        case LIBBSC_BLOCKSORTER_BWT : mode = LIBBSC_BLOCKSORTER_BWT; break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
+#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
 
-        case LIBBSC_BLOCKSORTER_ST5 : mode = LIBBSC_BLOCKSORTER_ST5; break;
-        case LIBBSC_BLOCKSORTER_ST4 : mode = LIBBSC_BLOCKSORTER_ST4; break;
         case LIBBSC_BLOCKSORTER_ST3 : mode = LIBBSC_BLOCKSORTER_ST3; break;
+        case LIBBSC_BLOCKSORTER_ST4 : mode = LIBBSC_BLOCKSORTER_ST4; break;
+        case LIBBSC_BLOCKSORTER_ST5 : mode = LIBBSC_BLOCKSORTER_ST5; break;
+        case LIBBSC_BLOCKSORTER_ST6 : mode = LIBBSC_BLOCKSORTER_ST6; break;
 
 #endif
 
-        case LIBBSC_BLOCKSORTER_BWT : mode = LIBBSC_BLOCKSORTER_BWT; break;
         default : return LIBBSC_BAD_PARAMETER;
     }
     if (lzpMinLen != 0 || lzpHashSize != 0)
@@ -257,16 +260,17 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
     int index = LIBBSC_BAD_PARAMETER; num_indexes = 0;
     switch (blockSorter)
     {
+        case LIBBSC_BLOCKSORTER_BWT : index = bsc_bwt_encode(output, lzSize, &num_indexes, indexes, features); break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
+#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
 
         case LIBBSC_BLOCKSORTER_ST3 : index = bsc_st3_encode(output, lzSize, features); break;
         case LIBBSC_BLOCKSORTER_ST4 : index = bsc_st4_encode(output, lzSize, features); break;
         case LIBBSC_BLOCKSORTER_ST5 : index = bsc_st5_encode(output, lzSize, features); break;
+        case LIBBSC_BLOCKSORTER_ST6 : index = bsc_st6_encode(output, lzSize, features); break;
 
 #endif
 
-        case LIBBSC_BLOCKSORTER_BWT : index = bsc_bwt_encode(output, lzSize, &num_indexes, indexes, features); break;
         default : return LIBBSC_BAD_PARAMETER;
     }
 
@@ -337,16 +341,17 @@ int bsc_block_info(const unsigned char * blockHeader, int headerSize, int * pBlo
     int test_mode = 0;
     switch (blockSorter)
     {
+        case LIBBSC_BLOCKSORTER_BWT : test_mode = LIBBSC_BLOCKSORTER_BWT; break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
+#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
 
-        case LIBBSC_BLOCKSORTER_ST5 : test_mode = LIBBSC_BLOCKSORTER_ST5; break;
-        case LIBBSC_BLOCKSORTER_ST4 : test_mode = LIBBSC_BLOCKSORTER_ST4; break;
         case LIBBSC_BLOCKSORTER_ST3 : test_mode = LIBBSC_BLOCKSORTER_ST3; break;
+        case LIBBSC_BLOCKSORTER_ST4 : test_mode = LIBBSC_BLOCKSORTER_ST4; break;
+        case LIBBSC_BLOCKSORTER_ST5 : test_mode = LIBBSC_BLOCKSORTER_ST5; break;
+        case LIBBSC_BLOCKSORTER_ST6 : test_mode = LIBBSC_BLOCKSORTER_ST6; break;
 
 #endif
 
-        case LIBBSC_BLOCKSORTER_BWT : test_mode = LIBBSC_BLOCKSORTER_BWT; break;
         default : if (blockSorter > 0) return LIBBSC_DATA_CORRUPT;
     }
     if (lzpMinLen != 0 || lzpHashSize != 0)
@@ -436,16 +441,17 @@ int bsc_decompress_inplace(unsigned char * data, int inputSize, int outputSize, 
     int result;
     switch (blockSorter)
     {
+        case LIBBSC_BLOCKSORTER_BWT : result = bsc_bwt_decode(data, lzSize, index, num_indexes, indexes, features); break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
+#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
 
         case LIBBSC_BLOCKSORTER_ST3 : result = bsc_st3_decode(data, lzSize, index, features); break;
         case LIBBSC_BLOCKSORTER_ST4 : result = bsc_st4_decode(data, lzSize, index, features); break;
         case LIBBSC_BLOCKSORTER_ST5 : result = bsc_st5_decode(data, lzSize, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST6 : result = bsc_st6_decode(data, lzSize, index, features); break;
 
 #endif
 
-        case LIBBSC_BLOCKSORTER_BWT : result = bsc_bwt_decode(data, lzSize, index, num_indexes, indexes, features); break;
         default : return LIBBSC_DATA_CORRUPT;
     }
     if (result < LIBBSC_NO_ERROR)
@@ -527,16 +533,17 @@ int bsc_decompress(const unsigned char * input, int inputSize, unsigned char * o
     int result;
     switch (blockSorter)
     {
+        case LIBBSC_BLOCKSORTER_BWT : result = bsc_bwt_decode(output, lzSize, index, num_indexes, indexes, features); break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
+#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
 
         case LIBBSC_BLOCKSORTER_ST3 : result = bsc_st3_decode(output, lzSize, index, features); break;
         case LIBBSC_BLOCKSORTER_ST4 : result = bsc_st4_decode(output, lzSize, index, features); break;
         case LIBBSC_BLOCKSORTER_ST5 : result = bsc_st5_decode(output, lzSize, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST6 : result = bsc_st6_decode(output, lzSize, index, features); break;
 
 #endif
 
-        case LIBBSC_BLOCKSORTER_BWT : result = bsc_bwt_decode(output, lzSize, index, num_indexes, indexes, features); break;
         default : return LIBBSC_DATA_CORRUPT;
     }
     if (result < LIBBSC_NO_ERROR)

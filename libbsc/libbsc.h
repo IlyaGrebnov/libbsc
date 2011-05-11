@@ -55,15 +55,16 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #define LIBBSC_UNEXPECTED_EOB         -4
 #define LIBBSC_DATA_CORRUPT           -5
 
+#define LIBBSC_BLOCKSORTER_BWT         1
+
 #ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 
-  #define LIBBSC_BLOCKSORTER_ST3         1
-  #define LIBBSC_BLOCKSORTER_ST4         2
-  #define LIBBSC_BLOCKSORTER_ST5         3
+  #define LIBBSC_BLOCKSORTER_ST3       2
+  #define LIBBSC_BLOCKSORTER_ST4       3
+  #define LIBBSC_BLOCKSORTER_ST5       4
+  #define LIBBSC_BLOCKSORTER_ST6       5
 
 #endif
-
-#define LIBBSC_BLOCKSORTER_BWT         4
 
 #define LIBBSC_FEATURE_NONE            0
 #define LIBBSC_FEATURE_FASTMODE        1

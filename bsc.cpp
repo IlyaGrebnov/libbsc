@@ -66,7 +66,7 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 #define LIBBSC_CONTEXTS_AUTODETECT   3
 
-unsigned char bscFileSign[4] = {'b', 's', 'c', 0x25};
+unsigned char bscFileSign[4] = {'b', 's', 'c', 0x26};
 
 typedef struct BSC_BLOCK_HEADER
 {
@@ -689,17 +689,18 @@ void ShowUsage(void)
     fprintf(stdout, "Switches:\n");
     fprintf(stdout, "  -b<size> Block size in megabytes, default: -b25\n");
     fprintf(stdout, "             minimum: -b1, maximum: -b1024\n");
-    fprintf(stdout, "  -m<algo> Block sorting algorithm, default: -m3\n");
+    fprintf(stdout, "  -m<algo> Block sorting algorithm, default: -m0\n");
+    fprintf(stdout, "             -m0 Burrows Wheeler Transform\n");
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
+#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
 
-    fprintf(stdout, "             -m0 Sort Transform of order 3\n");
-    fprintf(stdout, "             -m1 Sort Transform of order 4\n");
-    fprintf(stdout, "             -m2 Sort Transform of order 5\n");
+    fprintf(stdout, "             -m3 Sort Transform of order 3\n");
+    fprintf(stdout, "             -m4 Sort Transform of order 4\n");
+    fprintf(stdout, "             -m5 Sort Transform of order 5\n");
+    fprintf(stdout, "             -m6 Sort Transform of order 6\n");
 
 #endif
 
-    fprintf(stdout, "             -m3 Burrows Wheeler Transform\n");
     fprintf(stdout, "  -c<ctx>  Contexts for sorting, default: -cf\n");
     fprintf(stdout, "             -cf Following contexts\n");
     fprintf(stdout, "             -cp Preceding contexts\n");
@@ -749,16 +750,16 @@ void ProcessSwitch(char * s)
                     char * strNum = s; while ((*s >= '0') && (*s <= '9')) s++;
                     switch (atoi(strNum))
                     {
+                        case 0   : paramBlockSorter = LIBBSC_BLOCKSORTER_BWT; break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5)
+#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
 
-                        case 0   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST3; break;
-                        case 1   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST4; break;
-                        case 2   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST5; break;
-
+                        case 3   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST3; break;
+                        case 4   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST4; break;
+                        case 5   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST5; break;
+                        case 6   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST6; break;
 #endif
 
-                        case 3   : paramBlockSorter = LIBBSC_BLOCKSORTER_BWT; break;
                         default  : ShowUsage();
                     }
                     break;
@@ -831,7 +832,7 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.5.0. 20 March 2011.\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.6.0. 30 April 2011.\n");
     fprintf(stdout, "Copyright (c) 2009-2011 Ilya Grebnov <Ilya.Grebnov@libbsc.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)
@@ -840,8 +841,7 @@ int main(int argc, char * argv[])
 
 #endif
 
-    int result = bsc_init(LIBBSC_FEATURE_NONE);
-    if (result != LIBBSC_NO_ERROR)
+    if (bsc_init(LIBBSC_FEATURE_NONE) != LIBBSC_NO_ERROR)
     {
         fprintf(stderr, "\nInternal program error, please contact the author!\n");
         exit(2);

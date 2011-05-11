@@ -51,7 +51,7 @@ See also the bsc and libbsc web site:
 
 unsigned int bsc_crc32(const unsigned char * T, int n)
 {
-	unsigned int adler = 1;
+    unsigned int adler = 1;
     unsigned int sum2  = 0;
 
     while (n >= NMAX) 
