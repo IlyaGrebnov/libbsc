@@ -8,7 +8,9 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+
+See file AUTHORS for a full list of contributors.
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -39,7 +41,7 @@ See also the bsc and libbsc web site:
 #include "../common/common.h"
 #include "../libbsc.h"
 
-#define LZP_MATCH_FLAG 0xf2
+#define LIBBSC_LZP_MATCH_FLAG 0xF2
 
 int bsc_lzp_encode(const unsigned char * input, unsigned char * output, int n, int hashSize, int minLen)
 {
@@ -47,89 +49,97 @@ int bsc_lzp_encode(const unsigned char * input, unsigned char * output, int n, i
     {
         return LIBBSC_BAD_PARAMETER;
     }
-    if (int * Contexts = (int *)bsc_malloc((int)(1 << hashSize) * sizeof(int)))
+
+    if (int * lookup = (int *)bsc_malloc((int)(1 << hashSize) * sizeof(int)))
     {
-        memset(Contexts, 0, (int)(1 << hashSize) * sizeof(int));
+        memset(lookup, 0, (int)(1 << hashSize) * sizeof(int));
 
-        unsigned int hashMask = (int)(1 << hashSize) - 1;
+        unsigned int            mask        = (int)(1 << hashSize) - 1;
+        const unsigned char *   inputStart  = input;
+        const unsigned char *   inputEnd    = input + n;
+        const unsigned char *   outputStart = output;
+        const unsigned char *   outputEOB   = output + n - 32;
 
-        const unsigned char * inputStart = input;
-        const unsigned char * inputEnd = input + n;
-        const unsigned char * outputStart = output;
-        const unsigned char * outputEOB = output + n - 16;
-
-        unsigned int ctx = 0;
+        unsigned int context = 0;
         for (int i = 0; i < 4; ++i)
         {
-            ctx = (ctx << 8) | (*output++ = *input++);
+            context = (context << 8) | (*output++ = *input++);
         }
 
-        const unsigned char * hptr = input;
-
-        while ((input < inputEnd) && (output < outputEOB))
+        const unsigned char * heuristic      = input;
+        const unsigned char * inputMinLenEnd = input + n - minLen - 8;
+        while ((input < inputMinLenEnd) && (output < outputEOB))
         {
-            unsigned int hashIndex = ((ctx >> 15) ^ ctx ^ (ctx >> 3)) & hashMask;
-            int hashValue = Contexts[hashIndex]; Contexts[hashIndex] = (int)(input - inputStart);
-            if (hashValue > 0)
+            unsigned int index = ((context >> 15) ^ context ^ (context >> 3)) & mask;
+            int value = lookup[index]; lookup[index] = (int)(input - inputStart);
+            if (value > 0)
             {
-                const unsigned char * ptr = inputStart + hashValue;
-                if ((input + minLen <= inputEnd) && (*(unsigned int *)(input + minLen - 4) == *(unsigned int *)(ptr + minLen - 4)))
+                const unsigned char * reference = inputStart + value;
+                if ((*(unsigned int *)(input + minLen - 4) == *(unsigned int *)(reference + minLen - 4)) && (*(unsigned int *)(input) == *(unsigned int *)(reference)))
                 {
-                    if (hptr > input)
+                    if ((heuristic > input) && (*(unsigned int *)heuristic != *(unsigned int *)(reference + (heuristic - input))))
                     {
-                        if (*(unsigned int *)hptr != *(unsigned int *)(ptr + (hptr - input)))
-                        {
-                            goto MATCH_NOT_FOUND;
-                        }
+                        goto LIBBSC_LZP_MATCH_NOT_FOUND;
                     }
 
-                    int len = 0;
-                    for (; input + len + 4 <= inputEnd; len += 4)
+                    int len = 4;
+                    for (; input + len < inputMinLenEnd; len += 4)
                     {
-                        if (*(unsigned int *)(input + len) != *(unsigned int *)(ptr + len)) break;
+                        if (*(unsigned int *)(input + len) != *(unsigned int *)(reference + len)) break;
                     }
-                    if (len + 3 < minLen)
+                    if (len < minLen)
                     {
-                        if (hptr < input + len) hptr = input + len;
-                        goto MATCH_NOT_FOUND;
+                        if (heuristic < input + len) heuristic = input + len;
+                        goto LIBBSC_LZP_MATCH_NOT_FOUND;
                     }
-                    for (; input + len < inputEnd; ++len)
-                    {
-                        if (input[len] != ptr[len]) break;
-                    }
-                    if (len < minLen) goto MATCH_NOT_FOUND;
-                    input += len; ctx = (input[-1] + (input[-2] << 8) + (input[-3] << 16) + (input[-4] << 24));
-                    *output++ = LZP_MATCH_FLAG;
-                    for (len -= minLen; len >= 254; len -= 254)
-                    {
-                        *output++ = 254;
-                        if (output >= outputEOB) break;
-                    }
+
+                    if (input[len] == reference[len]) len++;
+                    if (input[len] == reference[len]) len++;
+                    if (input[len] == reference[len]) len++;
+
+                    input += len; context = (input[-1] + (input[-2] << 8) + (input[-3] << 16) + (input[-4] << 24));
+                    
+                    *output++ = LIBBSC_LZP_MATCH_FLAG; 
+                    
+                    len -= minLen; while (len >= 254) { len -= 254; *output++ = 254; if (output >= outputEOB) break; }
+
                     *output++ = (unsigned char)(len);
                 }
                 else
                 {
-MATCH_NOT_FOUND:
-                    unsigned char next = *output++ = *input++; ctx = (ctx << 8) | next;
-                    if (next == LZP_MATCH_FLAG)
-                    {
-                        *output++ = 255;
-                    }
-                }
 
+LIBBSC_LZP_MATCH_NOT_FOUND:
+                    
+                    unsigned char next = *output++ = *input++; context = (context << 8) | next;
+                    if (next == LIBBSC_LZP_MATCH_FLAG) *output++ = 255;
+                }
             }
             else
             {
-                ctx = (ctx << 8) | (*output++ = *input++);
+                context = (context << 8) | (*output++ = *input++);
             }
         }
-        bsc_free(Contexts);
-        if (output >= outputEOB)
+
+        while ((input < inputEnd) && (output < outputEOB))
         {
-            return LIBBSC_UNEXPECTED_EOB;
+            unsigned int index = ((context >> 15) ^ context ^ (context >> 3)) & mask;
+            int value = lookup[index]; lookup[index] = (int)(input - inputStart);
+            if (value > 0)
+            {
+                unsigned char next = *output++ = *input++; context = (context << 8) | next;
+                if (next == LIBBSC_LZP_MATCH_FLAG) *output++ = 255;
+            }
+            else
+            {
+                context = (context << 8) | (*output++ = *input++);
+            }
         }
-        return (int)(output - outputStart);
+
+        bsc_free(lookup);
+
+        return (output >= outputEOB) ? LIBBSC_UNEXPECTED_EOB : (int)(output - outputStart);
     }
+
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
@@ -139,55 +149,67 @@ int bsc_lzp_decode(const unsigned char * input, unsigned char * output, int n, i
     {
         return LIBBSC_UNEXPECTED_EOB;
     }
-    if (int * Contexts = (int *)bsc_malloc((int)(1 << hashSize) * sizeof(int)))
+
+    if (int * lookup = (int *)bsc_malloc((int)(1 << hashSize) * sizeof(int)))
     {
-        memset(Contexts, 0, (int)(1 << hashSize) * sizeof(int));
+        memset(lookup, 0, (int)(1 << hashSize) * sizeof(int));
 
-        unsigned int hashMask = (int)(1 << hashSize) - 1;
+        unsigned int            mask        = (int)(1 << hashSize) - 1;
+        const unsigned char *   inputEnd    = input + n;
+        const unsigned char *   outputStart = output;
 
-        const unsigned char * inputEnd = input + n;
-        const unsigned char * outputStart = output;
-
-        unsigned int ctx = 0;
+        unsigned int context = 0;
         for (int i = 0; i < 4; ++i)
         {
-            ctx = (ctx << 8) | (*output++ = *input++);
+            context = (context << 8) | (*output++ = *input++);
         }
 
         while (input < inputEnd)
         {
-            unsigned int hashIndex = ((ctx >> 15) ^ ctx ^ (ctx >> 3)) & hashMask;
-            int hashValue = Contexts[hashIndex]; Contexts[hashIndex] = (int)(output - outputStart);
-            if (*input == LZP_MATCH_FLAG && hashValue > 0)
+            unsigned int index = ((context >> 15) ^ context ^ (context >> 3)) & mask;
+            int value = lookup[index]; lookup[index] = (int)(output - outputStart);
+            if (*input == LIBBSC_LZP_MATCH_FLAG && value > 0)
             {
                 input++;
                 if (*input != 255)
                 {
-                    for (int len = minLen; true; )
+                    int len = minLen; while (true) { len += *input; if (*input++ != 254) break; }
+
+                    const unsigned char * reference = outputStart + value;
+                          unsigned char * outputEnd = output + len;
+
+                    if (output - reference < 4)
                     {
-                        len += *input;
-                        if (*input++ != 254)
-                        {
-                            const unsigned char * ptr = outputStart + hashValue;
-                            while (len--) *output++ = *ptr++;
-                            ctx = (output[-1] + (output[-2] << 8) + (output[-3] << 16) + (output[-4] << 24));
-                            break;
-                        }
+                        int offset[4] = {0, 3, 2, 3};
+                        
+                        *output++ = *reference++;
+                        *output++ = *reference++;
+                        *output++ = *reference++;
+                        *output++ = *reference++;
+
+                        reference -= offset[output - reference];
                     }
+
+                    while (output < outputEnd) { *(unsigned int *)output = *(unsigned int*)reference; output += 4; reference += 4; }
+
+                    output = outputEnd; context = (output[-1] + (output[-2] << 8) + (output[-3] << 16) + (output[-4] << 24));
                 }
                 else
                 {
-                    input++; ctx = (ctx << 8) | (*output++ = LZP_MATCH_FLAG);
+                    input++; context = (context << 8) | (*output++ = LIBBSC_LZP_MATCH_FLAG);
                 }
             }
             else
             {
-                ctx = (ctx << 8) | (*output++ = *input++);
+                context = (context << 8) | (*output++ = *input++);
             }
         }
-        bsc_free(Contexts);
+        
+        bsc_free(lookup);
+    
         return (int)(output - outputStart);
     }
+
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 

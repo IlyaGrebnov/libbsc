@@ -8,7 +8,9 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+
+See file AUTHORS for a full list of contributors.
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -35,9 +37,13 @@ See also the bsc and libbsc web site:
 
 #include "common.h"
 
+#if defined(_WIN32)
+  #include <windows.h>
+#endif
+
 void * bsc_malloc(size_t size)
 {
-#if defined(WIN32) || defined(WIN64)
+#if defined(_WIN32)
     return VirtualAlloc(0, size, MEM_COMMIT, PAGE_READWRITE);
 #else
     return malloc(size);
@@ -46,7 +52,7 @@ void * bsc_malloc(size_t size)
 
 void bsc_free(void * address)
 {
-#if defined(WIN32) || defined(WIN64)
+#if defined(_WIN32)
     VirtualFree(address, 0, MEM_RELEASE);
 #else
     free(address);

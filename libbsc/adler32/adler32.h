@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------*/
 /* Block Sorting, Lossless Data Compression Library.         */
-/* Interface to CRC32 (cyclic redundancy check) functions    */
+/* Interface to Adler-32 checksum functions                  */
 /*-----------------------------------------------------------*/
 
 /*--
@@ -8,7 +8,9 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+
+See file AUTHORS for a full list of contributors.
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -30,20 +32,20 @@ See also the bsc and libbsc web site:
 
 --*/
 
-#ifndef _LIBBSC_CRC32_H
-#define _LIBBSC_CRC32_H
+#ifndef _LIBBSC_ADLER32_H
+#define _LIBBSC_ADLER32_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
     /**
-    * Calculates 32-bit CRC (cyclic redundancy check) for input memory block.
+    * Calculates Adler-32 checksum for input memory block.
     * @param T - the input memory block of n bytes.
     * @param n - the length of the input memory block.
     * @return The value of cyclic redundancy check.
     */
-    unsigned int bsc_crc32(const unsigned char * T, int n);
+    unsigned int bsc_adler32(const unsigned char * T, int n);
 
 #ifdef __cplusplus
 }
@@ -52,5 +54,5 @@ extern "C" {
 #endif
 
 /*-----------------------------------------------------------*/
-/* End                                               crc32.h */
+/* End                                             adler32.h */
 /*-----------------------------------------------------------*/

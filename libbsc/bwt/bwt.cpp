@@ -8,7 +8,9 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+
+See file AUTHORS for a full list of contributors.
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -73,7 +75,7 @@ static int bsc_unbwt_mergedTL_sequential(unsigned char * T, unsigned int * P, in
 
     for (int sum = 1, i = 0; i < ALPHABET_SIZE; ++i)
     {
-        sum += bucket[i]; bucket[i] = sum - bucket[i];
+        int tmp = sum; sum += bucket[i]; bucket[i] = tmp;
     }
 
     for (int p = 0, i = n - 1; i >= 0; --i)
@@ -105,7 +107,7 @@ static int bsc_unbwt_biPSI_sequential(unsigned char * T, unsigned int * P, int n
 
             for (int sum = 1, c = 0; c < ALPHABET_SIZE; ++c)
             {
-                sum += count[c]; count[c] = sum - count[c];
+                int tmp = sum; sum += count[c]; count[c] = tmp;
                 if (count[c] != sum)
                 {
                     int * bucket_p = &bucket[c << 8];
@@ -126,7 +128,7 @@ static int bsc_unbwt_biPSI_sequential(unsigned char * T, unsigned int * P, int n
                 int * bucket_p = &bucket[c];
                 for (int d = 0; d < ALPHABET_SIZE; ++d)
                 {
-                    sum += bucket_p[d << 8]; bucket_p[d << 8] = sum - bucket_p[d << 8];
+                    int tmp = sum; sum += bucket_p[d << 8]; bucket_p[d << 8] = tmp;
                     if (bucket_p[d << 8] != sum)
                     {
                         for (; v <= ((sum - 1) >> shift); ++v) fastbits[v] = (c << 8) | d;
@@ -156,7 +158,7 @@ static int bsc_unbwt_biPSI_sequential(unsigned char * T, unsigned int * P, int n
             {
                 for (int d = 0; d < c; ++d)
                 {
-                    int t = bucket[(d << 8) | c]; bucket[(d << 8) | c] = bucket[(c << 8) | d]; bucket[(c << 8) | d] = t;
+                    int tmp = bucket[(d << 8) | c]; bucket[(d << 8) | c] = bucket[(c << 8) | d]; bucket[(c << 8) | d] = tmp;
                 }
             }
 
@@ -204,7 +206,7 @@ static int bsc_unbwt_mergedTL_parallel(unsigned char * T, unsigned int * P, int 
 
     for (int sum = 1, i = 0; i < ALPHABET_SIZE; ++i)
     {
-        sum += bucket[i]; bucket[i] = sum - bucket[i];
+        int tmp = sum; sum += bucket[i]; bucket[i] = tmp;
     }
 
     int mod = n / 8;
@@ -251,7 +253,7 @@ static int bsc_unbwt_biPSI_parallel(unsigned char * T, unsigned int * P, int n, 
 
             for (int sum = 1, c = 0; c < ALPHABET_SIZE; ++c)
             {
-                sum += count[c]; count[c] = sum - count[c];
+                int tmp = sum; sum += count[c]; count[c] = tmp;
                 if (count[c] != sum)
                 {
                     int * bucket_p = &bucket[c << 8];
@@ -272,7 +274,7 @@ static int bsc_unbwt_biPSI_parallel(unsigned char * T, unsigned int * P, int n, 
                 int * bucket_p = &bucket[c];
                 for (int d = 0; d < ALPHABET_SIZE; ++d)
                 {
-                    sum += bucket_p[d << 8]; bucket_p[d << 8] = sum - bucket_p[d << 8];
+                    int tmp = sum; sum += bucket_p[d << 8]; bucket_p[d << 8] = tmp;
                     if (bucket_p[d << 8] != sum)
                     {
                         for (; v <= ((sum - 1) >> shift); ++v) fastbits[v] = (c << 8) | d;
@@ -302,7 +304,7 @@ static int bsc_unbwt_biPSI_parallel(unsigned char * T, unsigned int * P, int n, 
             {
                 for (int d = 0; d < c; ++d)
                 {
-                    int t = bucket[(d << 8) | c]; bucket[(d << 8) | c] = bucket[(c << 8) | d]; bucket[(c << 8) | d] = t;
+                    int tmp = bucket[(d << 8) | c]; bucket[(d << 8) | c] = bucket[(c << 8) | d]; bucket[(c << 8) | d] = tmp;
                 }
             }
 

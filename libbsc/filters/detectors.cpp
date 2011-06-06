@@ -8,7 +8,9 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+
+See file AUTHORS for a full list of contributors.
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -400,8 +402,7 @@ int bsc_detect_contextsorder(const unsigned char * input, int n, int features)
 
                 for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                 {
-                    sum += bucket0[i];
-                    bucket0[i] = sum - bucket0[i];
+                    int tmp = sum; sum += bucket0[i]; bucket0[i] = tmp;
                 }
 
                 unsigned char F0 = input[n - 2];
@@ -417,8 +418,7 @@ int bsc_detect_contextsorder(const unsigned char * input, int n, int features)
 
                 for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                 {
-                    sum += bucket1[i];
-                    bucket1[i] = sum - bucket1[i];
+                    int tmp = sum; sum += bucket1[i]; bucket1[i] = tmp;
                 }
 
                 unsigned char P0 = input[1];

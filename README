@@ -10,7 +10,9 @@ block-sorting data compression algorithms.
 libbsc is a library based on bsc, it uses the same algorithms
 as bsc and enables you to compress memory blocks.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+
+See file AUTHORS for a full list of contributors.
 
 See the bsc and libbsc web site:
   http://libbsc.com/ for more information.
@@ -48,3 +50,40 @@ You should have received a copy of the GNU Lesser General Public License
 along with the bsc and libbsc. If not, see http://www.gnu.org/licenses/.
 
 Please see the files COPYING and COPYING.LIB for full copyright information.
+
+
+libdivsufsort:
+--------------
+
+The libdivsufsort project provides a fast, lightweight, and robust
+C API library to construct the suffix array and the Burrows-Wheeler
+transformed string for any input string of a constant-size alphabet.
+libbsc uses libdivsufsort for constructing Burrows-Wheeler transform.
+
+The libdivsufsort copyright is as follows:
+
+Copyright (c) 2003-2008 Yuta Mori All Rights Reserved.
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+See also the libdivsufsort web site:
+  http://libdivsufsort.googlecode.com/ for more information.

@@ -41,7 +41,7 @@ OBJS = preprocessing.o \
        detectors.o     \
        common.o        \
        libbsc.o        \
-       crc32.o         \
+       adler32.o         \
        qlfc.o          \
        bwt.o           \
        lzp.o           \
@@ -90,8 +90,8 @@ common.o: libbsc/common/common.cpp
 libbsc.o: libbsc/libbsc/libbsc.cpp
 	$(CC) $(CFLAGS) -c libbsc/libbsc/libbsc.cpp
 
-crc32.o: libbsc/crc32/crc32.cpp
-	$(CC) $(CFLAGS) -c libbsc/crc32/crc32.cpp
+adler32.o: libbsc/adler32/adler32.cpp
+	$(CC) $(CFLAGS) -c libbsc/adler32/adler32.cpp
 
 qlfc.o: libbsc/qlfc/qlfc.cpp
 	$(CC) $(CFLAGS) -c libbsc/qlfc/qlfc.cpp

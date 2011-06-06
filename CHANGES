@@ -1,3 +1,6 @@
+Changes in 2.7.0 (June 5, 2011)
+- Improved performance of LZP algorithm
+
 Changes in 2.6.1 (May 4, 2011)
 - Fixed bug in segmentation algorithm
 

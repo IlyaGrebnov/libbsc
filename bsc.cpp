@@ -8,7 +8,9 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+
+See file AUTHORS for a full list of contributors.
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -66,7 +68,7 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 #define LIBBSC_CONTEXTS_AUTODETECT   3
 
-unsigned char bscFileSign[4] = {'b', 's', 'c', 0x26};
+unsigned char bscFileSign[4] = {'b', 's', 'c', 0x27};
 
 typedef struct BSC_BLOCK_HEADER
 {
@@ -832,8 +834,8 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.6.1. 6 May 2011.\n");
-    fprintf(stdout, "Copyright (c) 2009-2011 Ilya Grebnov <Ilya.Grebnov@libbsc.com>.\n\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.7.0. 5 June 2011.\n");
+    fprintf(stdout, "Copyright (c) 2009-2011 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)
 

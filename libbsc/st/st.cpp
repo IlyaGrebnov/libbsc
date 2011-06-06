@@ -8,7 +8,9 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@libbsc.com>
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+
+See file AUTHORS for a full list of contributors.
 
 The bsc and libbsc is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -77,8 +79,7 @@ static int bsc_st3_transform_sequential(unsigned char * T, unsigned int * P, int
 
     for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
     {
-        sum += bucket[i];
-        bucket[i] = sum - bucket[i];
+        int tmp = sum; sum += bucket[i]; bucket[i] = tmp;
     }
 
     int pos = bucket[((T[1] & 0xf) << 8) | T[2]];
@@ -102,8 +103,7 @@ static int bsc_st3_transform_sequential(unsigned char * T, unsigned int * P, int
 
     for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
     {
-        sum += bucket[i];
-        bucket[i] = sum;
+        sum += bucket[i]; bucket[i] = sum;
     }
 
     for (int i = n - 1; i >= pos; --i)
@@ -135,8 +135,7 @@ static int bsc_st4_transform_sequential(unsigned char * T, unsigned int * P, int
 
     for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE; ++i)
     {
-        sum += bucket[i];
-        bucket[i] = sum - bucket[i];
+        int tmp = sum; sum += bucket[i]; bucket[i] = tmp;
     }
 
     int pos = bucket[(T[2] << 8) | T[3]];
@@ -179,8 +178,7 @@ static int bsc_st5_transform_sequential(unsigned char * T, unsigned int * P, int
 
     for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
     {
-        sum += bucket[i];
-        bucket[i] = sum - bucket[i];
+        int tmp = sum; sum += bucket[i]; bucket[i] = tmp;
     }
 
     int pos = bucket[((T[2] & 0xf) << 16) | (T[3] << 8) | T[4]];
@@ -207,8 +205,7 @@ static int bsc_st5_transform_sequential(unsigned char * T, unsigned int * P, int
 
     for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
     {
-        sum += bucket[i];
-        bucket[i] = sum;
+        sum += bucket[i]; bucket[i] = sum;
     }
 
     for (int i = n - 1; i >= pos; --i)
@@ -230,18 +227,15 @@ static int bsc_st6_transform_sequential(unsigned char * T, unsigned int * P, int
 
     for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
-    unsigned char C0 = T[n - 2], C1 = T[n - 1];
+    unsigned int W = (T[n - 2] << 16) | (T[n - 1] << 8) | T[0];
     for (int i = 0; i < n; ++i)
     {
-        unsigned char C2 = T[i];
-        bucket[(C0 << 16) | (C1 << 8) | C2]++;
-        C0 = C1; C1 = C2;
+        W = (W << 8) | T[i + 1]; bucket[W >> 8]++;
     }
 
     for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
     {
-        sum += bucket[i];
-        bucket[i] = sum - bucket[i];
+        int tmp = sum; sum += bucket[i]; bucket[i] = tmp;
     }
 
     int pos = bucket[(T[3] << 16) | (T[4] << 8) | T[5]];
@@ -322,11 +316,9 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
                 {
                     if (threadId == 0)
                     {
-                        for (int sum1 = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
+                        for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
                         {
-                            int sum0 = sum1; sum1 += bucket0[i] + bucket1[i];
-
-                            bucket0[i] = sum0; bucket1[i]= sum1 - 1;
+                            int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket0[i] = tmp; bucket1[i] = sum - 1;
                         }
 
                         pos = bucket0[((T[1] & 0xf) << 8) | T[2]];
@@ -391,11 +383,9 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
                 {
                     if (threadId == 0)
                     {
-                        for (int sum1 = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
+                        for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
                         {
-                            int sum0 = sum1; sum1 += bucket0[i] + bucket1[i];
-
-                            bucket0[i] = sum0; bucket1[i]= sum1 - 1;
+                            int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket0[i] = tmp; bucket1[i] = sum - 1;
                         }
                     }
 
@@ -512,11 +502,9 @@ static int bsc_st4_transform_parallel(unsigned char * T, unsigned int * P, int *
                     {
                         if (threadId == 0)
                         {
-                            for (int sum1 = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE; ++i)
+                            for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                             {
-                                int sum0 = sum1; sum1 += bucket0[i] + bucket1[i];
-
-                                bucket[i] = sum0; bucket0[i] = sum0; bucket1[i]= sum1 - 1;
+                                int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket[i] = bucket0[i] = tmp; bucket1[i]= sum - 1;
                             }
 
                             pos = bucket[(T[2] << 8) | T[3]];
@@ -667,11 +655,9 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
                 {
                     if (threadId == 0)
                     {
-                        for (int sum1 = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
+                        for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                         {
-                            int sum0 = sum1; sum1 += bucket0[i] + bucket1[i];
-
-                            bucket0[i] = sum0; bucket1[i]= sum1 - 1;
+                            int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket0[i] = tmp; bucket1[i] = sum - 1;
                         }
 
                         pos = bucket0[((T[2] & 0xf) << 16) | (T[3] << 8) | T[4]];
@@ -743,11 +729,9 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
                 {
                     if (threadId == 0)
                     {
-                        for (int sum1 = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
+                        for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                         {
-                            int sum0 = sum1; sum1 += bucket0[i] + bucket1[i];
-
-                            bucket0[i] = sum0; bucket1[i]= sum1 - 1;
+                            int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket0[i] = tmp; bucket1[i] = sum - 1;
                         }
                     }
 
@@ -837,24 +821,20 @@ static int bsc_st6_transform_parallel(unsigned char * T, unsigned int * P, int *
                         {
                             memset(bucket0, 0, ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
 
-                            unsigned char C0 = T[n - 2], C1 = T[n - 1];
+                            unsigned int W = (T[n - 2] << 16) | (T[n - 1] << 8) | T[0];
                             for (int i = 0; i < median; ++i)
                             {
-                                unsigned char C2 = T[i];
-                                bucket0[(C0 << 16) | (C1 << 8) | C2]++;
-                                C0 = C1; C1 = C2;
+                                W = (W << 8) | T[i + 1]; bucket0[W >> 8]++;
                             }
                         }
                         else
                         {
                             memset(bucket1, 0, ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
 
-                            unsigned char C0 = T[median - 2], C1 = T[median - 1];
+                            unsigned int W = (T[median - 2] << 16) | (T[median - 1] << 8) | T[median];
                             for (int i = median; i < n; ++i)
                             {
-                                unsigned char C2 = T[i];
-                                bucket1[(C0 << 16) | (C1 << 8) | C2]++;
-                                C0 = C1; C1 = C2;
+                                W = (W << 8) | T[i + 1]; bucket1[W >> 8]++;
                             }
                         }
 
@@ -864,11 +844,9 @@ static int bsc_st6_transform_parallel(unsigned char * T, unsigned int * P, int *
                     {
                         if (threadId == 0)
                         {
-                            for (int sum1 = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
+                            for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                             {
-                                int sum0 = sum1; sum1 += bucket0[i] + bucket1[i];
-
-                                bucket[i] = sum0; bucket0[i] = sum0; bucket1[i]= sum1 - 1;
+                                int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket[i] = bucket0[i] = tmp; bucket1[i] = sum - 1;
                             }
 
                             pos = bucket[(T[3] << 16) | (T[4] << 8) | T[5]];
@@ -1138,7 +1116,7 @@ static bool bsc_unst_sort(unsigned char * T, unsigned int * P, unsigned int * co
         {
             if (count[c] >= 0x800000) failBack = true;
 
-            sum += count[c]; count[c] = sum - count[c];
+            int tmp = sum; sum += count[c]; count[c] = tmp;
             if ((int)count[c] != sum)
             {
                 unsigned int * bucket_p = &bucket[c << 8];
@@ -1151,7 +1129,7 @@ static bool bsc_unst_sort(unsigned char * T, unsigned int * P, unsigned int * co
     {
         for (int d = 0; d < c; ++d)
         {
-            int t = bucket[(d << 8) | c]; bucket[(d << 8) | c] = bucket[(c << 8) | d]; bucket[(c << 8) | d] = t;
+            int tmp = bucket[(d << 8) | c]; bucket[(d << 8) | c] = bucket[(c << 8) | d]; bucket[(c << 8) | d] = tmp;
         }
     }
 
@@ -1173,7 +1151,7 @@ static bool bsc_unst_sort(unsigned char * T, unsigned int * P, unsigned int * co
 
     for (int sum = 0, w = 0; w < ALPHABET_SIZE * ALPHABET_SIZE; ++w)
     {
-        sum += bucket[w]; bucket[w] = sum - bucket[w];
+        int tmp = sum; sum += bucket[w]; bucket[w] = tmp;
         for (int i = bucket[w]; i < sum; ++i)
         {
             unsigned char c = T[i];
@@ -1324,7 +1302,7 @@ static void bsc_unst_reconstruct_case3(unsigned char * T, unsigned int * P, unsi
             for (int v = 0, c = 0; c < ALPHABET_SIZE; ++c)
             {
                 int sum = (c + 1 < ALPHABET_SIZE) ? index[c + 1] : n;
-                if (index[c] != sum)
+                if ((int)index[c] != sum)
                 {
                     for (; v <= (int)((sum - 1) >> shift); ++v) fastbits[v] = c;
                 }
