@@ -28,7 +28,7 @@ CFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 CFLAGS += -O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math
 
 # Comment out CFLAGS line below to disable OpenMP optimizations
-CFLAGS += -fopenmp
+CFLAGS += -fopenmp -DLIBBSC_OPENMP_SUPPORT
 
 # Comment out CFLAGS line below to enable debug output
 CFLAGS += -DNDEBUG
@@ -39,9 +39,9 @@ PREFIX = /usr
 OBJS = preprocessing.o \
        divsufsort.o    \
        detectors.o     \
-       common.o        \
+       platform.o      \
        libbsc.o        \
-       adler32.o         \
+       adler32.o       \
        qlfc.o          \
        bwt.o           \
        lzp.o           \
@@ -84,8 +84,8 @@ divsufsort.o: libbsc/bwt/divsufsort/divsufsort.c
 detectors.o: libbsc/filters/detectors.cpp
 	$(CC) $(CFLAGS) -c libbsc/filters/detectors.cpp
 
-common.o: libbsc/common/common.cpp
-	$(CC) $(CFLAGS) -c libbsc/common/common.cpp
+platform.o: libbsc/platform/platform.cpp
+	$(CC) $(CFLAGS) -c libbsc/platform/platform.cpp
 
 libbsc.o: libbsc/libbsc/libbsc.cpp
 	$(CC) $(CFLAGS) -c libbsc/libbsc/libbsc.cpp

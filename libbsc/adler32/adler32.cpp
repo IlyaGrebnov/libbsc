@@ -38,7 +38,7 @@ See also the bsc and libbsc web site:
 
 #include "adler32.h"
 
-#include "../common/common.h"
+#include "../platform/platform.h"
 #include "../libbsc.h"
 
 #define BASE 65521UL
@@ -51,12 +51,12 @@ See also the bsc and libbsc web site:
 #define DO16(buf)   DO8(buf, 0); DO8(buf, 8);
 #define MOD(a)      a %= BASE
 
-unsigned int bsc_adler32(const unsigned char * T, int n)
+unsigned int bsc_adler32(const unsigned char * T, int n, int features)
 {
     unsigned int sum1 = 1;
     unsigned int sum2 = 0;
 
-    while (n >= NMAX) 
+    while (n >= NMAX)
     {
         for (int i = 0; i < NMAX / 16; ++i)
         {
@@ -65,16 +65,16 @@ unsigned int bsc_adler32(const unsigned char * T, int n)
         MOD(sum1); MOD(sum2); n -= NMAX;
     }
 
-    while (n >= 16) 
+    while (n >= 16)
     {
-        DO16(T); T += 16; n -= 16; 
+        DO16(T); T += 16; n -= 16;
     }
 
     while (n > 0)
     {
-        DO1(T, 0); T += 1; n -= 1; 
+        DO1(T, 0); T += 1; n -= 1;
     }
-    
+
     MOD(sum1); MOD(sum2);
 
     return sum1 | (sum2 << 16);

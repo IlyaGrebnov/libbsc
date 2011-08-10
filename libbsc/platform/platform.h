@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------*/
 /* Block Sorting, Lossless Data Compression Library.         */
-/* Interface to common functions and constants               */
+/* Interface to platform specific functions and constants    */
 /*-----------------------------------------------------------*/
 
 /*--
@@ -32,8 +32,13 @@ See also the bsc and libbsc web site:
 
 --*/
 
-#ifndef _LIBBSC_GLOBAL_H
-#define _LIBBSC_GLOBAL_H
+#ifndef _LIBBSC_PLATFORM_H
+#define _LIBBSC_PLATFORM_H
+
+#if defined(_OPENMP) && defined(LIBBSC_OPENMP_SUPPORT)
+    #include <omp.h>
+    #define LIBBSC_OPENMP
+#endif
 
 #if defined(__GNUC__)
     #define INLINE __inline__
@@ -54,15 +59,29 @@ extern "C" {
 #endif
 
     /**
+    * You should call this function before you call any of the other platform specific functions.
+    * @param features   - the set of additional features.
+    * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
+    */
+    int bsc_platform_init(int features);
+
+    /**
     * Allocates memory blocks.
-    * @param size - bytes to allocate.
+    * @param size       - bytes to allocate.
     * @return a pointer to allocated space or NULL if there is insufficient memory available.
     */
     void * bsc_malloc(size_t size);
 
     /**
+    * Allocates memory blocks and initializes all its bits to zero.
+    * @param size       - bytes to allocate.
+    * @return a pointer to allocated space or NULL if there is insufficient memory available.
+    */
+    void * bsc_zero_malloc(size_t size);
+
+    /**
     * Deallocates or frees a memory block.
-    * @param address - Previously allocated memory block to be freed.
+    * @param address    - previously allocated memory block to be freed.
     */
     void bsc_free(void * address);
 

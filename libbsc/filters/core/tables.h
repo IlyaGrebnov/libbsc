@@ -35,7 +35,7 @@ See also the bsc and libbsc web site:
 #ifndef _LIBBSC_FILTERS_TABLES_H
 #define _LIBBSC_FILTERS_TABLES_H
 
-#include "../../common/common.h"
+#include "../../platform/platform.h"
 
 static const unsigned int bsc_code_table[4096] =
 {

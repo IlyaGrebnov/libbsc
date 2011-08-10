@@ -31,12 +31,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef _OPENMP
-# include <omp.h>
-#endif
+
 #include "divsufsort.h"
 
-#include "../../common/common.h"
+#include "../../platform/platform.h"
 #include "../../libbsc.h"
 
 /*- Constants -*/
@@ -1439,13 +1437,13 @@ sort_typeBstar(const unsigned char *T, int *SA,
                int *bucket_A, int *bucket_B,
                int n, int openMP) {
   int *PAb, *ISAb, *buf;
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
   int *curbuf;
   int l;
 #endif
   int i, j, k, t, m, bufsize;
   int c0, c1;
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
   int d0, d1;
 #endif
 
@@ -1499,7 +1497,7 @@ note:
     SA[--BUCKET_BSTAR(c0, c1)] = m - 1;
 
     /* Sort the type B* substrings using sssort. */
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
     if (openMP)
     {
         buf = SA + m;

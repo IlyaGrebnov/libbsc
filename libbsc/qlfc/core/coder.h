@@ -35,7 +35,7 @@ See also the bsc and libbsc web site:
 #ifndef _LIBBSC_QLFC_CODER_H
 #define _LIBBSC_QLFC_CODER_H
 
-#include "../../common/common.h"
+#include "../../platform/platform.h"
 
 class BinaryCoder
 {

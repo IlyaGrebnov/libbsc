@@ -35,15 +35,12 @@ See also the bsc and libbsc web site:
 #include <stdlib.h>
 #include <memory.h>
 
-#ifdef _OPENMP
-  #include <omp.h>
-#endif
-
 #include "bwt.h"
-#include "divsufsort/divsufsort.h"
 
-#include "../common/common.h"
+#include "../platform/platform.h"
 #include "../libbsc.h"
+
+#include "divsufsort/divsufsort.h"
 
 int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * indexes, int features)
 {
@@ -56,7 +53,7 @@ int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * 
     return index;
 }
 
-static int bsc_unbwt_mergedTL_sequential(unsigned char * T, unsigned int * P, int n, int index)
+static int bsc_unbwt_mergedTL_serial(unsigned char * T, unsigned int * P, int n, int index)
 {
     unsigned int bucket[ALPHABET_SIZE];
 
@@ -90,16 +87,13 @@ static int bsc_unbwt_mergedTL_sequential(unsigned char * T, unsigned int * P, in
 
 #define BWT_NUM_FASTBITS (17)
 
-static int bsc_unbwt_biPSI_sequential(unsigned char * T, unsigned int * P, int n, int index)
+static int bsc_unbwt_biPSI_serial(unsigned char * T, unsigned int * P, int n, int index)
 {
-    if (int * bucket = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+    if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
         if (unsigned short * fastbits = (unsigned short *)bsc_malloc((1 + (1 << BWT_NUM_FASTBITS)) * sizeof(unsigned short)))
         {
-            int count[ALPHABET_SIZE];
-
-            memset(count , 0, ALPHABET_SIZE * sizeof(int));
-            memset(bucket, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
+            int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(int));
 
             int shift = 0; while ((n >> shift) > (1 << BWT_NUM_FASTBITS)) shift++;
 
@@ -179,13 +173,13 @@ static int bsc_unbwt_biPSI_sequential(unsigned char * T, unsigned int * P, int n
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
-static int bsc_unbwt_reconstruct_sequential(unsigned char * T, unsigned int * P, int n, int index)
+static int bsc_unbwt_reconstruct_serial(unsigned char * T, unsigned int * P, int n, int index)
 {
-    if (n < 3 * 1024 * 1024) return bsc_unbwt_mergedTL_sequential(T, P, n, index);
-    return bsc_unbwt_biPSI_sequential(T, P, n, index);
+    if (n < 3 * 1024 * 1024) return bsc_unbwt_mergedTL_serial(T, P, n, index);
+    return bsc_unbwt_biPSI_serial(T, P, n, index);
 }
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
 static int bsc_unbwt_mergedTL_parallel(unsigned char * T, unsigned int * P, int n, int index, int * indexes)
 {
@@ -218,7 +212,7 @@ static int bsc_unbwt_mergedTL_parallel(unsigned char * T, unsigned int * P, int 
 
     int nBlocks = 1 + (n - 1) / mod;
 
-    #pragma omp parallel for default(shared) schedule(dynamic, 1)
+    #pragma omp parallel for schedule(dynamic)
     for (int blockId = 0; blockId < nBlocks; ++blockId)
     {
         int p           = (blockId < nBlocks - 1) ? indexes[blockId] + 1    : 0;
@@ -238,31 +232,45 @@ static int bsc_unbwt_mergedTL_parallel(unsigned char * T, unsigned int * P, int 
 
 static int bsc_unbwt_biPSI_parallel(unsigned char * T, unsigned int * P, int n, int index, int * indexes)
 {
-    if (int * bucket = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+    if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
         if (unsigned short * fastbits = (unsigned short *)bsc_malloc((1 + (1 << BWT_NUM_FASTBITS)) * sizeof(unsigned short)))
         {
-            int count[ALPHABET_SIZE];
-
-            memset(count , 0, ALPHABET_SIZE * sizeof(int));
-            memset(bucket, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
+            int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(int));
 
             int shift = 0; while ((n >> shift) > (1 << BWT_NUM_FASTBITS)) shift++;
 
-            for (int i = 0; i < n; ++i) count[T[i]]++;
+            #pragma omp parallel
+            {
+                unsigned int count_local[ALPHABET_SIZE];
+
+                memset(count_local, 0, ALPHABET_SIZE * sizeof(unsigned int));
+
+                #pragma omp for schedule(static) nowait
+                for (int i = 0; i < n; ++i) count_local[T[i]]++;
+
+                #pragma omp critical
+                for (int c = 0; c < ALPHABET_SIZE; ++c) count[c] += count_local[c];
+            }
 
             for (int sum = 1, c = 0; c < ALPHABET_SIZE; ++c)
             {
                 int tmp = sum; sum += count[c]; count[c] = tmp;
-                if (count[c] != sum)
+            }
+
+            #pragma omp parallel for schedule(static, 1)
+            for (int c = 0; c < ALPHABET_SIZE; ++c)
+            {
+                int start = count[c], end = (c + 1 < ALPHABET_SIZE) ? count[c + 1] : n + 1;
+                if (start != end)
                 {
                     int * bucket_p = &bucket[c << 8];
 
-                    int hi = index; if (sum < hi) hi = sum;
-                    for (int i = count[c]; i < hi; ++i) bucket_p[T[i]]++;
+                    int hi = index; if (end < hi) hi = end;
+                    for (int i = start; i < hi; ++i) bucket_p[T[i]]++;
 
-                    int lo = index + 1; if (count[c] > lo) lo = count[c];
-                    for (int i = lo; i < sum; ++i) bucket_p[T[i - 1]]++;
+                    int lo = index + 1; if (start > lo) lo = start;
+                    for (int i = lo; i < end; ++i) bucket_p[T[i - 1]]++;
                 }
             }
 
@@ -317,7 +325,7 @@ static int bsc_unbwt_biPSI_parallel(unsigned char * T, unsigned int * P, int n, 
 
             int nBlocks = 1 + (n - 1) / mod;
 
-            #pragma omp parallel for default(shared) schedule(dynamic, 1)
+            #pragma omp parallel for schedule(dynamic)
             for (int blockId = 0; blockId < nBlocks; ++blockId)
             {
                 int p           = (blockId > 0          ) ? indexes[blockId - 1] + 1    : index;
@@ -364,7 +372,7 @@ int bsc_bwt_decode(unsigned char * T, int n, int index, unsigned char num_indexe
     {
         int result = LIBBSC_NO_ERROR;
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
         int mod = n / 8;
         {
@@ -382,7 +390,7 @@ int bsc_bwt_decode(unsigned char * T, int n, int index, unsigned char num_indexe
 #endif
 
         {
-            result = bsc_unbwt_reconstruct_sequential(T, P, n, index);
+            result = bsc_unbwt_reconstruct_serial(T, P, n, index);
         }
 
         bsc_free(P);

@@ -63,12 +63,13 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 #include "../libbsc/libbsc.h"
 #include "../libbsc/filters.h"
+#include "../libbsc/platform/platform.h"
 
 #pragma pack(push, 1)
 
 #define LIBBSC_CONTEXTS_AUTODETECT   3
 
-unsigned char bscFileSign[4] = {'b', 's', 'c', 0x27};
+unsigned char bscFileSign[4] = {'b', 's', 'c', 0x28};
 
 typedef struct BSC_BLOCK_HEADER
 {
@@ -80,6 +81,7 @@ typedef struct BSC_BLOCK_HEADER
 int paramBlockSize                = 25 * 1024 * 1024;
 int paramEnableSegmentation       = 0;
 int paramEnableReordering         = 0;
+int paramEnableLargePages         = 0;
 int paramEnableFastMode           = 0;
 int paramEnableLZP                = 1;
 int paramLZPHashSize              = 16;
@@ -170,7 +172,7 @@ void Compression(char * argv[])
         exit(1);
     }
 
-    int nBlocks = (int)((fileSize + paramBlockSize - 1) / paramBlockSize);
+    int nBlocks = paramBlockSize > 0 ? (int)((fileSize + paramBlockSize - 1) / paramBlockSize) : 0;
     if (fwrite(&nBlocks, sizeof(nBlocks), 1, fOutput) != 1)
     {
         fprintf(stderr, "IO error on file: %s!\n", argv[3]);
@@ -196,10 +198,10 @@ void Compression(char * argv[])
     int segmentationStart = 0, segmentationEnd = 0;
 
 #ifdef _OPENMP
-    #pragma omp parallel default(shared) num_threads(numThreads)
+    #pragma omp parallel num_threads(numThreads) if(numThreads > 1)
 #endif
     {
-        unsigned char * buffer = (unsigned char *)malloc(paramBlockSize + LIBBSC_HEADER_SIZE);
+        unsigned char * buffer = (unsigned char *)bsc_malloc(paramBlockSize + LIBBSC_HEADER_SIZE);
         if (buffer == NULL)
         {
 #ifdef _OPENMP
@@ -379,7 +381,7 @@ void Compression(char * argv[])
                     BSC_FSEEK(fInput, pos, SEEK_SET);
                 }
 
-                blockSize = bsc_store(buffer, buffer, dataSize);
+                blockSize = bsc_store(buffer, buffer, dataSize, paramEnableMultiThreading ? LIBBSC_FEATURE_MULTITHREADING : LIBBSC_FEATURE_NONE);
             }
             if (blockSize < LIBBSC_NO_ERROR)
             {
@@ -417,7 +419,7 @@ void Compression(char * argv[])
 
         }
 
-        free(buffer);
+        bsc_free(buffer);
     }
 
     fprintf(stdout, "\r%.55s compressed %.0f into %.0f in %.3f seconds.\n", argv[2], (double)fileSize, (double)BSC_FTELL(fOutput), BSC_CLOCK() - startTime);
@@ -495,21 +497,10 @@ void Decompression(char * argv[])
         }
     }
 
-    #pragma omp parallel default(shared) num_threads(numThreads)
+    #pragma omp parallel num_threads(numThreads) if(numThreads > 1)
 #endif
     {
-        int bufferSize = 1024;
-        unsigned char * buffer = (unsigned char *)malloc(bufferSize);
-        if (buffer == NULL)
-        {
-#ifdef _OPENMP
-            #pragma omp critical(print)
-#endif
-            {
-                fprintf(stderr, "Not enough memory!\n");
-                exit(2);
-            }
-        }
+        int bufferSize = -1; unsigned char * buffer = NULL;
 
         while (true)
         {
@@ -566,22 +557,18 @@ void Decompression(char * argv[])
                         exit(1);
                     }
 
-                    if (bsc_block_info(bscBlockHeader, LIBBSC_HEADER_SIZE, &blockSize, &dataSize) != LIBBSC_NO_ERROR)
+                    if (bsc_block_info(bscBlockHeader, LIBBSC_HEADER_SIZE, &blockSize, &dataSize, paramEnableMultiThreading ? LIBBSC_FEATURE_MULTITHREADING : LIBBSC_FEATURE_NONE) != LIBBSC_NO_ERROR)
                     {
                         fprintf(stderr, "\nThis is not bsc archive or invalid compression method!\n");
                         exit(2);
                     }
 
-                    if (blockSize > bufferSize)
+                    if ((blockSize > bufferSize) || (dataSize > bufferSize))
                     {
-                        free(buffer); buffer = (unsigned char *)malloc(blockSize);
-                        bufferSize = blockSize;
-                    }
+                        if (blockSize > bufferSize) bufferSize = blockSize;
+                        if (dataSize  > bufferSize) bufferSize = dataSize;
 
-                    if (dataSize > bufferSize)
-                    {
-                        free(buffer); buffer = (unsigned char *)malloc(dataSize);
-                        bufferSize = dataSize;
+                        if (buffer != NULL) bsc_free(buffer); buffer = (unsigned char *)bsc_malloc(bufferSize);
                     }
 
                     if (buffer == NULL)
@@ -671,7 +658,7 @@ void Decompression(char * argv[])
             }
         }
 
-        free(buffer);
+        if (buffer != NULL) bsc_free(buffer);
     }
 
     if (BSC_FSEEK(fOutput, 0, SEEK_END))
@@ -716,6 +703,12 @@ void ShowUsage(void)
     fprintf(stdout, "  -r       Enable Reordering, default: disable\n");
     fprintf(stdout, "  -s       Enable Segmentation, default: disable\n");
     fprintf(stdout, "  -p       Disable all preprocessing techniques\n");
+
+#ifdef _WIN32
+
+    fprintf(stdout, "  -P       Enable large RAM pages (2 MB) support, default: disable\n");
+
+#endif
 
 #ifdef _OPENMP
 
@@ -807,6 +800,10 @@ void ProcessSwitch(char * s)
 
             case 'p': paramEnableLZP = paramEnableSegmentation = paramEnableReordering = 0; break;
 
+#ifdef _WIN32
+            case 'P': paramEnableLargePages     = 1; break;
+#endif
+
             default : ShowUsage();
         }
     }
@@ -834,7 +831,7 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.7.0. 5 June 2011.\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.8.0. 8 August 2011.\n");
     fprintf(stdout, "Copyright (c) 2009-2011 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)
@@ -843,13 +840,14 @@ int main(int argc, char * argv[])
 
 #endif
 
-    if (bsc_init(LIBBSC_FEATURE_NONE) != LIBBSC_NO_ERROR)
+    ProcessCommandline(argc, argv);
+
+    if (bsc_init(paramEnableLargePages ? LIBBSC_FEATURE_LARGEPAGES : LIBBSC_FEATURE_NONE) != LIBBSC_NO_ERROR)
     {
         fprintf(stderr, "\nInternal program error, please contact the author!\n");
         exit(2);
     }
 
-    ProcessCommandline(argc, argv);
     switch (*argv[1])
     {
         case 'e' : case 'E' : Compression(argv); break;

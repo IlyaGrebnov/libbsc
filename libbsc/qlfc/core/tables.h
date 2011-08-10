@@ -35,7 +35,7 @@ See also the bsc and libbsc web site:
 #ifndef _LIBBSC_QLFC_TABLES_H
 #define _LIBBSC_QLFC_TABLES_H
 
-#include "../../common/common.h"
+#include "../../platform/platform.h"
 
 static const char bsc_log2_table[256] =
 {

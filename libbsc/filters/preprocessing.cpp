@@ -35,18 +35,15 @@ See also the bsc and libbsc web site:
 #include <stdlib.h>
 #include <memory.h>
 
-#ifdef _OPENMP
-  #include <omp.h>
-#endif
-
-#include "../common/common.h"
-#include "../libbsc.h"
 #include "../filters.h"
+
+#include "../platform/platform.h"
+#include "../libbsc.h"
 
 int bsc_reverse_block(unsigned char * T, int n, int features)
 {
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
     if (features & LIBBSC_FEATURE_MULTITHREADING)
     {
@@ -84,14 +81,24 @@ int bsc_reorder_forward(unsigned char * T, int n, char recordSize, int features)
 
         int chunk = (n / recordSize);
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
         if (features & LIBBSC_FEATURE_MULTITHREADING)
         {
-            #pragma omp parallel for
-            for (int i = 0; i < chunk; ++i)
+            switch (recordSize)
             {
-                for (int j = 0; j < recordSize; ++j) D[j * chunk + i]  = S[j + i * recordSize];
+                case 2:
+                    #pragma omp parallel for
+                    for (int i = 0; i < chunk; ++i) { D[i] = S[2 * i]; D[chunk + i] = S[2 * i + 1]; } break;
+                case 3:
+                    #pragma omp parallel for
+                    for (int i = 0; i < chunk; ++i) { D[i] = S[3 * i]; D[chunk + i] = S[3 * i + 1]; D[chunk * 2 + i] = S[3 * i + 2]; } break;
+                case 4:
+                    #pragma omp parallel for
+                    for (int i = 0; i < chunk; ++i) { D[i] = S[4 * i]; D[chunk + i] = S[4 * i + 1]; D[chunk * 2 + i] = S[4 * i + 2]; D[chunk * 3 + i] = S[4 * i + 3]; } break;
+                default:
+                    #pragma omp parallel for
+                    for (int i = 0; i < chunk; ++i) { for (int j = 0; j < recordSize; ++j) D[j * chunk + i] = S[recordSize * i + j]; }
             }
         }
         else
@@ -99,10 +106,13 @@ int bsc_reorder_forward(unsigned char * T, int n, char recordSize, int features)
 #endif
 
         {
-            for (int i = 0; i < chunk; ++i)
+            switch (recordSize)
             {
-                for (int j = 0; j < recordSize; ++j) D[j * chunk]  = *S++;
-                D++;
+                case 2: for (int i = 0; i < chunk; ++i) { D[0] = S[0]; D[chunk] = S[1]; D++; S += 2; } break;
+                case 3: for (int i = 0; i < chunk; ++i) { D[0] = S[0]; D[chunk] = S[1]; D[chunk * 2] = S[2]; D++; S += 3; } break;
+                case 4: for (int i = 0; i < chunk; ++i) { D[0] = S[0]; D[chunk] = S[1]; D[chunk * 2] = S[2]; D[chunk * 3] = S[3]; D++; S += 4; } break;
+                default:
+                    for (int i = 0; i < chunk; ++i) { for (int j = 0; j < recordSize; ++j) D[j * chunk] = S[j]; D++; S += recordSize; }
             }
         }
 
@@ -126,14 +136,24 @@ int bsc_reorder_reverse(unsigned char * T, int n, char recordSize, int features)
 
         int chunk = (n / recordSize);
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
         if (features & LIBBSC_FEATURE_MULTITHREADING)
         {
-            #pragma omp parallel for
-            for (int i = 0; i < chunk; ++i)
+            switch (recordSize)
             {
-                for (int j = 0; j < recordSize; ++j) D[j + i * recordSize]  = S[j * chunk + i];
+                case 2:
+                    #pragma omp parallel for
+                    for (int i = 0; i < chunk; ++i) { D[2 * i] = S[i]; D[2 * i + 1] = S[chunk + i]; } break;
+                case 3:
+                    #pragma omp parallel for
+                    for (int i = 0; i < chunk; ++i) { D[3 * i] = S[i]; D[3 * i + 1] = S[chunk + i]; D[3 * i + 2] = S[chunk * 2 + i]; } break;
+                case 4:
+                    #pragma omp parallel for
+                    for (int i = 0; i < chunk; ++i) { D[4 * i] = S[i]; D[4 * i + 1] = S[chunk + i]; D[4 * i + 2] = S[chunk * 2 + i]; D[4 * i + 3] = S[chunk * 3 + i]; } break;
+                default:
+                    #pragma omp parallel for
+                    for (int i = 0; i < chunk; ++i) { for (int j = 0; j < recordSize; ++j) D[recordSize * i + j] = S[j * chunk + i]; }
             }
         }
         else
@@ -141,10 +161,13 @@ int bsc_reorder_reverse(unsigned char * T, int n, char recordSize, int features)
 #endif
 
         {
-            for (int i = 0; i < chunk; ++i)
+            switch (recordSize)
             {
-                for (int j = 0; j < recordSize; ++j) *D++  = S[j * chunk];
-                S++;
+                case 2: for (int i = 0; i < chunk; ++i) { D[0] = S[0]; D[1] = S[chunk]; D += 2; S++; } break;
+                case 3: for (int i = 0; i < chunk; ++i) { D[0] = S[0]; D[1] = S[chunk]; D[2] = S[chunk * 2]; D += 3; S++; } break;
+                case 4: for (int i = 0; i < chunk; ++i) { D[0] = S[0]; D[1] = S[chunk]; D[2] = S[chunk * 2]; D[3] = S[chunk * 3]; D += 4; S++; } break;
+                default:
+                    for (int i = 0; i < chunk; ++i) { for (int j = 0; j < recordSize; ++j) D[j] = S[j * chunk]; D += recordSize; S++; }
             }
         }
 

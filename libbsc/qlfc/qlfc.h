@@ -41,27 +41,27 @@ extern "C" {
 
     /**
     * You should call this function before you call any of the other functions in qlfc.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
     int bsc_qlfc_init(int features);
 
     /**
     * Compress a memory block using Quantized Local Frequency Coding.
-    * @param input - the input memory block of n bytes.
-    * @param output - the output memory block of n bytes.
-    * @param n - the length of the input memory block.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
-    * @return The length of compressed memory block if no error occurred, error code otherwise.
+    * @param input      - the input memory block of n bytes.
+    * @param output     - the output memory block of n bytes.
+    * @param n          - the length of the input memory block.
+    * @param features   - the set of additional features.
+    * @return the length of compressed memory block if no error occurred, error code otherwise.
     */
     int bsc_qlfc_compress(const unsigned char * input, unsigned char * output, int n, int features);
 
     /**
     * Decompress a memory block using Quantized Local Frequency Coding.
-    * @param input - the input memory block.
-    * @param output - the output memory block.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
-    * @return The length of decompressed memory block if no error occurred, error code otherwise.
+    * @param input      - the input memory block.
+    * @param output     - the output memory block.
+    * @param features   - the set of additional features.
+    * @return the length of decompressed memory block if no error occurred, error code otherwise.
     */
     int bsc_qlfc_decompress(const unsigned char * input, unsigned char * output, int features);
 

@@ -35,7 +35,7 @@ See also the bsc and libbsc web site:
 #ifndef _LIBBSC_QLFC_PREDICTOR_H
 #define _LIBBSC_QLFC_PREDICTOR_H
 
-#include "../../common/common.h"
+#include "../../platform/platform.h"
 
 #include "tables.h"
 

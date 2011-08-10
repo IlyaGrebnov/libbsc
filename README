@@ -18,6 +18,18 @@ See the bsc and libbsc web site:
   http://libbsc.com/ for more information.
 
 
+Memory usage:
+-------------
+
+bsc compresses large files in blocks. Multiple blocks can be processed in
+parallel on multiple-core CPU. At decompression time, the block size used
+for compression is read from the header of the compressed file. The block
+size and number of blocks processed in parallel affects both the compression
+ratio achieved, and the amount of memory needed for compression and decompression.
+Compression and decompression requirements are the same and in bytes, can
+be estimated as 16Mb + 5 x block size x number of blocks processed in parallel.
+
+
 Sort Transform:
 ---------------
 

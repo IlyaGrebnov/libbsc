@@ -40,26 +40,28 @@ extern "C" {
 #endif
 
     /**
-    * Preprocess a memory block by Lempel Ziv Preprocessor.
-    * @param input - the input memory block of n bytes.
-    * @param output - the output memory block of n bytes.
-    * @param n - the length of the input/output memory blocks.
-    * @param lzpHashSize - the hash table size.
-    * @param lzpMinLen - the minimum match length.
+    * Preprocess a memory block by LZP algorithm.
+    * @param input      - the input memory block of n bytes.
+    * @param output     - the output memory block of n bytes.
+    * @param n          - the length of the input/output memory blocks.
+    * @param hashSize   - the hash table size.
+    * @param minLen     - the minimum match length.
+    * @param features   - the set of additional features.
     * @return The length of preprocessed memory block if no error occurred, error code otherwise.
     */
-    int bsc_lzp_encode(const unsigned char * input, unsigned char * output, int n, int hashSize, int minLen);
+    int bsc_lzp_compress(const unsigned char * input, unsigned char * output, int n, int hashSize, int minLen, int features);
 
     /**
-    * Reconstructs the original memory block after Lempel Ziv Preprocessor.
-    * @param input - the input memory block of n bytes.
-    * @param output - the output memory block.
-    * @param n - the length of the input memory block.
-    * @param lzpHashSize - the hash table size.
-    * @param lzpMinLen - the minimum match length.
+    * Reconstructs the original memory block after LZP algorithm.
+    * @param input      - the input memory block of n bytes.
+    * @param output     - the output memory block.
+    * @param n          - the length of the input memory block.
+    * @param hashSize   - the hash table size.
+    * @param minLen     - the minimum match length.
+    * @param features   - the set of additional features.
     * @return The length of original memory block if no error occurred, error code otherwise.
     */
-    int bsc_lzp_decode(const unsigned char * input, unsigned char * output, int n, int hashSize, int minLen);
+    int bsc_lzp_decompress(const unsigned char * input, unsigned char * output, int n, int hashSize, int minLen, int features);
 
 #ifdef __cplusplus
 }

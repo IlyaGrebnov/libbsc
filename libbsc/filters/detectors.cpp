@@ -35,13 +35,10 @@ See also the bsc and libbsc web site:
 #include <stdlib.h>
 #include <memory.h>
 
-#ifdef _OPENMP
-  #include <omp.h>
-#endif
-
-#include "../common/common.h"
-#include "../libbsc.h"
 #include "../filters.h"
+
+#include "../platform/platform.h"
+#include "../libbsc.h"
 
 #include "core/tables.h"
 
@@ -68,7 +65,7 @@ struct BscReorderingModel
     } contexts[DETECTORS_MAX_RECORD_SIZE][ALPHABET_SIZE];
 };
 
-int bsc_detect_segments_sequential(BscBlockModel * model, const unsigned char * input, int n)
+int bsc_detect_segments_serial(BscBlockModel * model, const unsigned char * input, int n)
 {
     memset(model, 0, sizeof(BscBlockModel));
 
@@ -114,20 +111,20 @@ int bsc_detect_segments_sequential(BscBlockModel * model, const unsigned char * 
     return blockSize;
 }
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
 int bsc_detect_segments_parallel(BscBlockModel * model0, BscBlockModel * model1, const unsigned char * input, int n)
 {
     int globalBlockSize = n; long long globalBestEntropy;
 
-    #pragma omp parallel default(shared) num_threads(2)
+    #pragma omp parallel num_threads(2)
     {
         int nThreads = omp_get_num_threads();
         int threadId = omp_get_thread_num();
 
         if (nThreads == 1)
         {
-            globalBlockSize = bsc_detect_segments_sequential(model0, input, n);
+            globalBlockSize = bsc_detect_segments_serial(model0, input, n);
         }
         else
         {
@@ -163,7 +160,7 @@ int bsc_detect_segments_parallel(BscBlockModel * model0, BscBlockModel * model1,
             }
 
             {
-                if (threadId == 0)
+                #pragma omp single
                 {
                     long long entropy = 0;
                     for (int context = 0; context < ALPHABET_SIZE; ++context)
@@ -181,8 +178,6 @@ int bsc_detect_segments_parallel(BscBlockModel * model0, BscBlockModel * model1,
 
                     globalBestEntropy = entropy;
                 }
-
-                #pragma omp barrier
             }
 
             {
@@ -259,7 +254,7 @@ int bsc_detect_segments_recursive(BscBlockModel * model0, BscBlockModel * model1
 
     int blockSize = n;
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
     if (features & LIBBSC_FEATURE_MULTITHREADING)
     {
@@ -270,7 +265,7 @@ int bsc_detect_segments_recursive(BscBlockModel * model0, BscBlockModel * model1
 #endif
 
     {
-        blockSize = bsc_detect_segments_sequential(model0, input, n);
+        blockSize = bsc_detect_segments_serial(model0, input, n);
     }
 
     if (blockSize == n)
@@ -383,14 +378,10 @@ int bsc_detect_contextsorder(const unsigned char * input, int n, int features)
 
     if (unsigned char * buffer = (unsigned char *)bsc_malloc(n * sizeof(unsigned char)))
     {
-        if (int * bucket0 = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+        if (int * bucket0 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
-            memset(bucket0, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
-            if (int * bucket1 = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+            if (int * bucket1 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
             {
-                memset(bucket1, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
                 unsigned char C0 = input[n - 1];
                 for (int i = 0; i < n; ++i)
                 {

@@ -58,76 +58,76 @@ extern "C" {
 
     /**
     * Constructs the Sort Transform  of order 3 transformed string of a given string.
-    * @param T - the input/output string of n chars.
-    * @param n - the length of the given string.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param T          - the input/output string of n chars.
+    * @param n          - the length of the given string.
+    * @param features   - the set of additional features.
     * @return the primary index if no error occurred, error code otherwise.
     */
     int bsc_st3_encode(unsigned char * T, int n, int features);
 
     /**
     * Reconstructs the original string from Sort Transform of order 3 transformed string.
-    * @param T - the input/output string of n chars.
-    * @param n - the length of the given string.
-    * @param index - the primary index.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param T          - the input/output string of n chars.
+    * @param n          - the length of the given string.
+    * @param index      - the primary index.
+    * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
     int bsc_st3_decode(unsigned char * T, int n, int index, int features);
 
     /**
     * Constructs the Sort Transform  of order 4 transformed string of a given string.
-    * @param T - the input/output string of n chars.
-    * @param n - the length of the given string.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param T          - the input/output string of n chars.
+    * @param n          - the length of the given string.
+    * @param features   - the set of additional features.
     * @return the primary index if no error occurred, error code otherwise.
     */
     int bsc_st4_encode(unsigned char * T, int n, int features);
 
     /**
     * Reconstructs the original string from Sort Transform of order 4 transformed string.
-    * @param T - the input/output string of n chars.
-    * @param n - the length of the given string.
-    * @param index - the primary index.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param T          - the input/output string of n chars.
+    * @param n          - the length of the given string.
+    * @param index      - the primary index.
+    * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
     int bsc_st4_decode(unsigned char * T, int n, int index, int features);
 
     /**
     * Constructs the Sort Transform  of order 5 transformed string of a given string.
-    * @param T - the input/output string of n chars.
-    * @param n - the length of the given string.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param T          - the input/output string of n chars.
+    * @param n          - the length of the given string.
+    * @param features   - the set of additional features.
     * @return the primary index if no error occurred, error code otherwise.
     */
     int bsc_st5_encode(unsigned char * T, int n, int features);
 
     /**
     * Reconstructs the original string from Sort Transform of order 5 transformed string.
-    * @param T - the input/output string of n chars.
-    * @param n - the length of the given string.
-    * @param index - the primary index.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param T          - the input/output string of n chars.
+    * @param n          - the length of the given string.
+    * @param index      - the primary index.
+    * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
     int bsc_st5_decode(unsigned char * T, int n, int index, int features);
 
     /**
     * Constructs the Sort Transform  of order 6 transformed string of a given string.
-    * @param T - the input/output string of n chars.
-    * @param n - the length of the given string.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param T          - the input/output string of n chars.
+    * @param n          - the length of the given string.
+    * @param features   - the set of additional features.
     * @return the primary index if no error occurred, error code otherwise.
     */
     int bsc_st6_encode(unsigned char * T, int n, int features);
 
     /**
     * Reconstructs the original string from Sort Transform of order 6 transformed string.
-    * @param T - the input/output string of n chars.
-    * @param n - the length of the given string.
-    * @param index - the primary index.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param T          - the input/output string of n chars.
+    * @param n          - the length of the given string.
+    * @param index      - the primary index.
+    * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
     int bsc_st6_decode(unsigned char * T, int n, int index, int features);

@@ -52,77 +52,61 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #include <stdlib.h>
 #include <memory.h>
 
-#ifdef _OPENMP
-  #include <omp.h>
-#endif
-
 #include "st.h"
 
 #include "../libbsc.h"
-#include "../common/common.h"
+#include "../platform/platform.h"
 
 #define ALPHABET_SQRT_SIZE  (16)
 
-static int bsc_st3_transform_sequential(unsigned char * T, unsigned int * P, int * bucket, int n)
+static int bsc_st3_transform_serial(unsigned char * T, unsigned short * P, int * bucket, int n)
 {
-    memset(bucket, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * sizeof(int));
+    unsigned int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(unsigned int));
 
     for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
-    unsigned char C0 = T[n - 1] & 0xf;
+    unsigned char C0 = T[n - 1];
     for (int i = 0; i < n; ++i)
     {
         unsigned char C1 = T[i];
-        bucket[(C0 << 8) | C1]++;
-        C0 = C1 & 0xf;
+        count[C1]++; bucket[(C0 << 8) | C1]++;
+        C0 = C1;
     }
 
-    for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
+    for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE; ++i)
     {
         int tmp = sum; sum += bucket[i]; bucket[i] = tmp;
     }
 
-    int pos = bucket[((T[1] & 0xf) << 8) | T[2]];
+    for (int sum = 0, i = 0; i < ALPHABET_SIZE; ++i)
+    {
+        int tmp = sum; sum += count[i]; count[i] = tmp;
+    }
+
+    int pos = bucket[(T[1] << 8) | T[2]];
 
     unsigned int W = (T[n - 1] << 16) | (T[0] << 8) | T[1];
     for (int i = 0; i < n; ++i)
     {
         W = (W << 8) | T[i + 2];
-        P[bucket[W & 0x00000fff]++] = W >> 12;
+        P[bucket[W & 0x0000ffff]++] = W >> 16;
     }
 
-    memset(bucket, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * sizeof(int));
-
-    unsigned char P0 = T[n - 1];
-    for (int i = 0; i < n; ++i)
+    for (int i = 0; i < pos; ++i)
     {
-        unsigned char P1 = T[i];
-        bucket[(P0 << 4) | (P1 >> 4)]++;
-        P0 = P1;
+        T[count[P[i] & 0x00ff]++] = (unsigned char)(P[i] >> 8);
     }
-
-    for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
+    int index = count[P[pos] & 0x00ff];
+    for (int i = pos; i < n; ++i)
     {
-        sum += bucket[i]; bucket[i] = sum;
-    }
-
-    for (int i = n - 1; i >= pos; --i)
-    {
-        T[--bucket[P[i] & 0x00000fff]] = (unsigned char)(P[i] >> 12);
-    }
-    int index = bucket[P[pos] & 0x00000fff];
-    for (int i = pos - 1; i >= 0; --i)
-    {
-        T[--bucket[P[i] & 0x00000fff]] = (unsigned char)(P[i] >> 12);
+        T[count[P[i] & 0x00ff]++] = (unsigned char)(P[i] >> 8);
     }
 
     return index;
 }
 
-static int bsc_st4_transform_sequential(unsigned char * T, unsigned int * P, int * bucket, int n)
+static int bsc_st4_transform_serial(unsigned char * T, unsigned int * P, int * bucket, int n)
 {
-    memset(bucket, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
     for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
     unsigned char C0 = T[n - 1];
@@ -161,10 +145,8 @@ static int bsc_st4_transform_sequential(unsigned char * T, unsigned int * P, int
     return index;
 }
 
-static int bsc_st5_transform_sequential(unsigned char * T, unsigned int * P, int * bucket, int n)
+static int bsc_st5_transform_serial(unsigned char * T, unsigned int * P, int * bucket, int n)
 {
-    memset(bucket, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
     for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
     unsigned char C0 = T[n - 2] & 0xf;
@@ -221,10 +203,8 @@ static int bsc_st5_transform_sequential(unsigned char * T, unsigned int * P, int
     return index;
 }
 
-static int bsc_st6_transform_sequential(unsigned char * T, unsigned int * P, int * bucket, int n)
+static int bsc_st6_transform_serial(unsigned char * T, unsigned int * P, int * bucket, int n)
 {
-    memset(bucket, 0, ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
     for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
     unsigned int W = (T[n - 2] << 16) | (T[n - 1] << 8) | T[0];
@@ -261,24 +241,27 @@ static int bsc_st6_transform_sequential(unsigned char * T, unsigned int * P, int
     return index;
 }
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
-static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int * bucket0, int n)
+static int bsc_st3_transform_parallel(unsigned char * T, unsigned short * P, int * bucket0, int n)
 {
-    if (int * bucket1 = (int *)bsc_malloc(ALPHABET_SQRT_SIZE * ALPHABET_SIZE * sizeof(int)))
+    unsigned int count0[ALPHABET_SIZE]; memset(count0, 0, ALPHABET_SIZE * sizeof(unsigned int));
+    unsigned int count1[ALPHABET_SIZE]; memset(count1, 0, ALPHABET_SIZE * sizeof(unsigned int));
+
+    if (int * bucket1 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
         int pos, index;
 
         for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
-        #pragma omp parallel default(shared) num_threads(2)
+        #pragma omp parallel num_threads(2)
         {
             int nThreads = omp_get_num_threads();
             int threadId = omp_get_thread_num();
 
             if (nThreads == 1)
             {
-                index = bsc_st3_transform_sequential(T, P, bucket0, n);
+                index = bsc_st3_transform_serial(T, P, bucket0, n);
             }
             else
             {
@@ -287,26 +270,22 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
                 {
                     if (threadId == 0)
                     {
-                        memset(bucket0, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * sizeof(int));
-
-                        unsigned char C0 = T[n - 1] & 0xf;
+                        unsigned char C0 = T[n - 1];
                         for (int i = 0; i < median; ++i)
                         {
                             unsigned char C1 = T[i];
-                            bucket0[(C0 << 8) | C1]++;
-                            C0 = C1 & 0xf;
+                            count0[C1]++; bucket0[(C0 << 8) | C1]++;
+                            C0 = C1;
                         }
                     }
                     else
                     {
-                        memset(bucket1, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * sizeof(int));
-
-                        unsigned char C0 = T[median - 1] & 0xf;
+                        unsigned char C0 = T[median - 1];
                         for (int i = median; i < n; ++i)
                         {
                             unsigned char C1 = T[i];
-                            bucket1[(C0 << 8) | C1]++;
-                            C0 = C1 & 0xf;
+                            count1[C1]++; bucket1[(C0 << 8) | C1]++;
+                            C0 = C1;
                         }
                     }
 
@@ -314,17 +293,20 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
                 }
 
                 {
-                    if (threadId == 0)
+                    #pragma omp single
                     {
-                        for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
+                        for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                         {
                             int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket0[i] = tmp; bucket1[i] = sum - 1;
                         }
 
-                        pos = bucket0[((T[1] & 0xf) << 8) | T[2]];
-                    }
+                        for (int sum = 0, i = 0; i < ALPHABET_SIZE; ++i)
+                        {
+                            int tmp = sum; sum += count0[i] + count1[i]; count0[i] = tmp; count1[i] = sum - 1;
+                        }
 
-                    #pragma omp barrier
+                        pos = bucket0[(T[1] << 8) | T[2]];
+                    }
                 }
 
                 {
@@ -334,7 +316,7 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
                         for (int i = 0; i < median; ++i)
                         {
                             W = (W << 8) | T[i + 2];
-                            P[bucket0[W & 0x00000fff]++] = W >> 12;
+                            P[bucket0[W & 0x0000ffff]++] = W >> 16;
                         }
                     }
                     else
@@ -342,50 +324,8 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
                         unsigned int W = (T[n - 2] << 24) | (T[n - 1] << 16) | (T[0] << 8) | T[1];
                         for (int i = n - 1; i >= median; --i)
                         {
-                            P[bucket1[W & 0x00000fff]--] = W >> 12;
+                            P[bucket1[W & 0x0000ffff]--] = W >> 16;
                             W = (W >> 8) | (T[i - 2] << 24);
-                        }
-                    }
-
-                    #pragma omp barrier
-                }
-
-                {
-                    if (threadId == 0)
-                    {
-                        memset(bucket0, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * sizeof(int));
-
-                        unsigned char P0 = T[n - 1];
-                        for (int i = 0; i < median; ++i)
-                        {
-                            unsigned char P1 = T[i];
-                            bucket0[(P0 << 4) | (P1 >> 4)]++;
-                            P0 = P1;
-                        }
-                    }
-                    else
-                    {
-                        memset(bucket1, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * sizeof(int));
-
-                        unsigned char P0 = T[median - 1];
-                        for (int i = median; i < n; ++i)
-                        {
-                            unsigned char P1 = T[i];
-                            bucket1[(P0 << 4) | (P1 >> 4)]++;
-                            P0 = P1;
-                        }
-
-                    }
-
-                    #pragma omp barrier
-                }
-
-                {
-                    if (threadId == 0)
-                    {
-                        for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE; ++i)
-                        {
-                            int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket0[i] = tmp; bucket1[i] = sum - 1;
                         }
                     }
 
@@ -399,19 +339,19 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
                         {
                             for (int i = 0; i < pos; ++i)
                             {
-                                T[bucket0[P[i] & 0x00000fff]++] = (unsigned char)(P[i] >> 12);
+                                T[count0[P[i] & 0x00ff]++] = (unsigned char)(P[i] >> 8);
                             }
-                            index = bucket0[P[pos] & 0x00000fff];
+                            index = count0[P[pos] & 0x00ff];
                             for (int i = pos; i < median; ++i)
                             {
-                                T[bucket0[P[i] & 0x00000fff]++] = (unsigned char)(P[i] >> 12);
+                                T[count0[P[i] & 0x00ff]++] = (unsigned char)(P[i] >> 8);
                             }
                         }
                         else
                         {
                             for (int i = 0; i < median; ++i)
                             {
-                                T[bucket0[P[i] & 0x00000fff]++] = (unsigned char)(P[i] >> 12);
+                                T[count0[P[i] & 0x00ff]++] = (unsigned char)(P[i] >> 8);
                             }
                         }
                     }
@@ -421,19 +361,19 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
                         {
                             for (int i = n - 1; i > pos; --i)
                             {
-                                T[bucket1[P[i] & 0x00000fff]--] = (unsigned char)(P[i] >> 12);
+                                T[count1[P[i] & 0x00ff]--] = (unsigned char)(P[i] >> 8);
                             }
-                            index = bucket1[P[pos] & 0x00000fff];
+                            index = count1[P[pos] & 0x00ff];
                             for (int i = pos; i >= median; --i)
                             {
-                                T[bucket1[P[i] & 0x00000fff]--] = (unsigned char)(P[i] >> 12);
+                                T[count1[P[i] & 0x00ff]--] = (unsigned char)(P[i] >> 8);
                             }
                         }
                         else
                         {
                             for (int i = n - 1; i >= median; --i)
                             {
-                                T[bucket1[P[i] & 0x00000fff]--] = (unsigned char)(P[i] >> 12);
+                                T[count1[P[i] & 0x00ff]--] = (unsigned char)(P[i] >> 8);
                             }
                         }
                     }
@@ -449,22 +389,22 @@ static int bsc_st3_transform_parallel(unsigned char * T, unsigned int * P, int *
 
 static int bsc_st4_transform_parallel(unsigned char * T, unsigned int * P, int * bucket, int n)
 {
-    if (int * bucket0 = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+    if (int * bucket0 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
-        if (int * bucket1 = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+        if (int * bucket1 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
             int pos, index;
 
             for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
-            #pragma omp parallel default(shared) num_threads(2)
+            #pragma omp parallel num_threads(2)
             {
                 int nThreads = omp_get_num_threads();
                 int threadId = omp_get_thread_num();
 
                 if (nThreads == 1)
                 {
-                    index = bsc_st4_transform_sequential(T, P, bucket, n);
+                    index = bsc_st4_transform_serial(T, P, bucket, n);
                 }
                 else
                 {
@@ -473,8 +413,6 @@ static int bsc_st4_transform_parallel(unsigned char * T, unsigned int * P, int *
                     {
                         if (threadId == 0)
                         {
-                            memset(bucket0, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
                             unsigned char C0 = T[n - 1];
                             for (int i = 0; i < median; ++i)
                             {
@@ -485,8 +423,6 @@ static int bsc_st4_transform_parallel(unsigned char * T, unsigned int * P, int *
                         }
                         else
                         {
-                            memset(bucket1, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
                             unsigned char C0 = T[median - 1];
                             for (int i = median; i < n; ++i)
                             {
@@ -500,7 +436,7 @@ static int bsc_st4_transform_parallel(unsigned char * T, unsigned int * P, int *
                     }
 
                     {
-                        if (threadId == 0)
+                        #pragma omp single
                         {
                             for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                             {
@@ -509,8 +445,6 @@ static int bsc_st4_transform_parallel(unsigned char * T, unsigned int * P, int *
 
                             pos = bucket[(T[2] << 8) | T[3]];
                         }
-
-                        #pragma omp barrier
                     }
 
                     {
@@ -602,20 +536,20 @@ static int bsc_st4_transform_parallel(unsigned char * T, unsigned int * P, int *
 
 static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int * bucket0, int n)
 {
-    if (int * bucket1 = (int *)bsc_malloc(ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+    if (int * bucket1 = (int *)bsc_zero_malloc(ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
         int pos, index;
 
         for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
-        #pragma omp parallel default(shared) num_threads(2)
+        #pragma omp parallel num_threads(2)
         {
             int nThreads = omp_get_num_threads();
             int threadId = omp_get_thread_num();
 
             if (nThreads == 1)
             {
-                index = bsc_st5_transform_sequential(T, P, bucket0, n);
+                index = bsc_st5_transform_serial(T, P, bucket0, n);
             }
             else
             {
@@ -624,8 +558,6 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
                 {
                     if (threadId == 0)
                     {
-                        memset(bucket0, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
                         unsigned char C0 = T[n - 2] & 0xf;
                         unsigned char C1 = T[n - 1];
                         for (int i = 0; i < median; ++i)
@@ -637,8 +569,6 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
                     }
                     else
                     {
-                        memset(bucket1, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
                         unsigned char C0 = T[median - 2] & 0xf;
                         unsigned char C1 = T[median - 1];
                         for (int i = median; i < n; ++i)
@@ -653,7 +583,7 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
                 }
 
                 {
-                    if (threadId == 0)
+                    #pragma omp single
                     {
                         for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                         {
@@ -662,8 +592,6 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
 
                         pos = bucket0[((T[2] & 0xf) << 16) | (T[3] << 8) | T[4]];
                     }
-
-                    #pragma omp barrier
                 }
 
                 {
@@ -678,26 +606,7 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
                             L = (unsigned char)(W >> 24); W = (W << 8) | T[i + 4];
                             P[bucket0[W & 0x000fffff]++] = V;
                         }
-                    }
-                    else
-                    {
-                        unsigned char L = T[n - 1];
-                        unsigned int  W = (T[0] << 24) | (T[1] << 16) | (T[2] << 8) | T[3];
-                        for (int i = n - 1; i >= median; --i)
-                        {
-                            unsigned int S = W & 0x000fffff;
 
-                            W = (W >> 8) | (L << 24); L = T[i - 1];
-                            P[bucket1[S]--] = (W & 0xfffff000) | L;
-                        }
-                    }
-
-                    #pragma omp barrier
-                }
-
-                {
-                    if (threadId == 0)
-                    {
                         memset(bucket0, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
 
                         unsigned char P0 = T[n - 2];
@@ -711,6 +620,16 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
                     }
                     else
                     {
+                        unsigned char L = T[n - 1];
+                        unsigned int  W = (T[0] << 24) | (T[1] << 16) | (T[2] << 8) | T[3];
+                        for (int i = n - 1; i >= median; --i)
+                        {
+                            unsigned int S = W & 0x000fffff;
+
+                            W = (W >> 8) | (L << 24); L = T[i - 1];
+                            P[bucket1[S]--] = (W & 0xfffff000) | L;
+                        }
+
                         memset(bucket1, 0, ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
 
                         unsigned char P0 = T[median - 2];
@@ -727,15 +646,13 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
                 }
 
                 {
-                    if (threadId == 0)
+                    #pragma omp single
                     {
                         for (int sum = 0, i = 0; i < ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
                         {
                             int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket0[i] = tmp; bucket1[i] = sum - 1;
                         }
                     }
-
-                    #pragma omp barrier
                 }
 
                 {
@@ -795,22 +712,22 @@ static int bsc_st5_transform_parallel(unsigned char * T, unsigned int * P, int *
 
 static int bsc_st6_transform_parallel(unsigned char * T, unsigned int * P, int * bucket, int n)
 {
-    if (int * bucket0 = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+    if (int * bucket0 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
-        if (int * bucket1 = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+        if (int * bucket1 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
             int pos, index;
 
             for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
-            #pragma omp parallel default(shared) num_threads(2)
+            #pragma omp parallel num_threads(2)
             {
                 int nThreads = omp_get_num_threads();
                 int threadId = omp_get_thread_num();
 
                 if (nThreads == 1)
                 {
-                    index = bsc_st6_transform_sequential(T, P, bucket, n);
+                    index = bsc_st6_transform_serial(T, P, bucket, n);
                 }
                 else
                 {
@@ -819,8 +736,6 @@ static int bsc_st6_transform_parallel(unsigned char * T, unsigned int * P, int *
                     {
                         if (threadId == 0)
                         {
-                            memset(bucket0, 0, ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
                             unsigned int W = (T[n - 2] << 16) | (T[n - 1] << 8) | T[0];
                             for (int i = 0; i < median; ++i)
                             {
@@ -829,8 +744,6 @@ static int bsc_st6_transform_parallel(unsigned char * T, unsigned int * P, int *
                         }
                         else
                         {
-                            memset(bucket1, 0, ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int));
-
                             unsigned int W = (T[median - 2] << 16) | (T[median - 1] << 8) | T[median];
                             for (int i = median; i < n; ++i)
                             {
@@ -844,12 +757,17 @@ static int bsc_st6_transform_parallel(unsigned char * T, unsigned int * P, int *
                     {
                         if (threadId == 0)
                         {
-                            for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i)
+                            for (int sum = 0, i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE / 2; ++i)
                             {
-                                int tmp = sum; sum += bucket0[i] + bucket1[i]; bucket[i] = bucket0[i] = tmp; bucket1[i] = sum - 1;
+                                int tmp = sum; sum = sum + bucket0[i] + bucket1[i]; bucket[i] = bucket0[i] = tmp; bucket1[i] = sum - 1;
                             }
-
-                            pos = bucket[(T[3] << 16) | (T[4] << 8) | T[5]];
+                        }
+                        else
+                        {
+                            for (int sum = n, i = ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE - 1; i >= ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE / 2; --i)
+                            {
+                                int tmp = sum; sum = sum - bucket0[i] - bucket1[i]; bucket[i] = bucket0[i] = sum; bucket1[i] = tmp - 1;
+                            }
                         }
 
                         #pragma omp barrier
@@ -858,6 +776,8 @@ static int bsc_st6_transform_parallel(unsigned char * T, unsigned int * P, int *
                     {
                         if (threadId == 0)
                         {
+                            pos = bucket0[(T[3] << 16) | (T[4] << 8) | T[5]];
+
                             unsigned int W0 = (T[n - 2] << 24) | (T[n - 1] << 16) | (T[0] << 8) | T[1];
                             unsigned int W1 = (T[    2] << 24) | (T[    3] << 16) | (T[4] << 8) | T[5];
                             for (int i = 0; i < median; ++i)
@@ -883,50 +803,59 @@ static int bsc_st6_transform_parallel(unsigned char * T, unsigned int * P, int *
                     {
                         if (threadId == 0)
                         {
-                            for (int i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE; ++i) bucket0[i] = bucket[i];
+                            memcpy(bucket1, bucket + 1, (ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE / 2) * sizeof(int));
+                        }
+                        else
+                        {
+                            memcpy(bucket1 + ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE / 2, bucket  + ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE / 2 + 1, (ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE / 2- 1) * sizeof(int));
+                            bucket1[ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE - 1] = n;
+                        }
 
+                        #pragma omp barrier
+                    }
+
+                    {
+                        if (threadId == 0)
+                        {
                             if (pos < median)
                             {
                                 for (int i = 0; i < pos; ++i)
                                 {
-                                    T[bucket0[P[i] >> 8]++] = P[i] & 0xff;
+                                    T[bucket[P[i] >> 8]++] = P[i] & 0xff;
                                 }
-                                index = bucket0[P[pos] >> 8];
+                                index = bucket[P[pos] >> 8];
                                 for (int i = pos; i < median; ++i)
                                 {
-                                    T[bucket0[P[i] >> 8]++] = P[i] & 0xff;
+                                    T[bucket[P[i] >> 8]++] = P[i] & 0xff;
                                 }
                             }
                             else
                             {
                                 for (int i = 0; i < median; ++i)
                                 {
-                                    T[bucket0[P[i] >> 8]++] = P[i] & 0xff;
+                                    T[bucket[P[i] >> 8]++] = P[i] & 0xff;
                                 }
                             }
                         }
                         else
                         {
-                            for (int i = 0; i < ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE - 1; ++i) bucket1[i] = bucket[i + 1] - 1;
-                            bucket1[ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE - 1] = n - 1;
-
                             if (pos >= median)
                             {
-                                for (int i = n - 1; i > pos; --i)
+                                for (int i = n - 1; i >= pos; --i)
                                 {
-                                    T[bucket1[P[i] >> 8]--] = P[i] & 0xff;
+                                    T[--bucket1[P[i] >> 8]] = P[i] & 0xff;
                                 }
                                 index = bucket1[P[pos] >> 8];
-                                for (int i = pos; i >= median; --i)
+                                for (int i = pos - 1; i >= median; --i)
                                 {
-                                    T[bucket1[P[i] >> 8]--] = P[i] & 0xff;
+                                    T[--bucket1[P[i] >> 8]] = P[i] & 0xff;
                                 }
                             }
                             else
                             {
                                 for (int i = n - 1; i >= median; --i)
                                 {
-                                    T[bucket1[P[i] >> 8]--] = P[i] & 0xff;
+                                    T[--bucket1[P[i] >> 8]] = P[i] & 0xff;
                                 }
                             }
                         }
@@ -955,13 +884,13 @@ int bsc_st3_encode(unsigned char * T, int n, int features)
         return 0;
     }
 
-    if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
+    if (unsigned short * P = (unsigned short *)bsc_malloc(n * sizeof(unsigned short)))
     {
-        if (int * bucket = (int *)bsc_malloc(ALPHABET_SQRT_SIZE * ALPHABET_SIZE * sizeof(int)))
+        if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
             int index = LIBBSC_NO_ERROR;
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
             if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
             {
@@ -972,7 +901,7 @@ int bsc_st3_encode(unsigned char * T, int n, int features)
 #endif
 
             {
-                index = bsc_st3_transform_sequential(T, P, bucket, n);
+                index = bsc_st3_transform_serial(T, P, bucket, n);
             }
 
             bsc_free(bucket); bsc_free(P);
@@ -996,11 +925,11 @@ int bsc_st4_encode(unsigned char * T, int n, int features)
 
     if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
     {
-        if (int * bucket = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+        if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
             int index = LIBBSC_NO_ERROR;
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
             if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
             {
@@ -1011,7 +940,7 @@ int bsc_st4_encode(unsigned char * T, int n, int features)
 #endif
 
             {
-                index = bsc_st4_transform_sequential(T, P, bucket, n);
+                index = bsc_st4_transform_serial(T, P, bucket, n);
             }
 
             bsc_free(bucket); bsc_free(P);
@@ -1035,11 +964,11 @@ int bsc_st5_encode(unsigned char * T, int n, int features)
 
     if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
     {
-        if (int * bucket = (int *)bsc_malloc(ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+        if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
             int index = LIBBSC_NO_ERROR;
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
             if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
             {
@@ -1050,7 +979,7 @@ int bsc_st5_encode(unsigned char * T, int n, int features)
 #endif
 
             {
-                index = bsc_st5_transform_sequential(T, P, bucket, n);
+                index = bsc_st5_transform_serial(T, P, bucket, n);
             }
 
             bsc_free(bucket); bsc_free(P);
@@ -1074,13 +1003,13 @@ int bsc_st6_encode(unsigned char * T, int n, int features)
 
     if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
     {
-        if (int * bucket = (int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+        if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
             int index = LIBBSC_NO_ERROR;
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
-            if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 4 * 1024 * 1024))
+            if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 6 * 1024 * 1024))
             {
                 index = bsc_st6_transform_parallel(T, P, bucket, n);
             }
@@ -1089,7 +1018,7 @@ int bsc_st6_encode(unsigned char * T, int n, int features)
 #endif
 
             {
-                index = bsc_st6_transform_sequential(T, P, bucket, n);
+                index = bsc_st6_transform_serial(T, P, bucket, n);
             }
 
             bsc_free(bucket); bsc_free(P);
@@ -1100,14 +1029,10 @@ int bsc_st6_encode(unsigned char * T, int n, int features)
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
-static bool bsc_unst_sort(unsigned char * T, unsigned int * P, unsigned int * count, unsigned int * bucket, int n, int k)
+static bool bsc_unst_sort_serial(unsigned char * T, unsigned int * P, unsigned int * count, unsigned int * bucket, int n, int k)
 {
     unsigned int index[ALPHABET_SIZE];
              int group[ALPHABET_SIZE];
-
-    memset(P     , 0, n * sizeof(unsigned int));
-    memset(count , 0, ALPHABET_SIZE * sizeof(unsigned int));
-    memset(bucket, 0, ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int));
 
     bool failBack = false;
     {
@@ -1185,7 +1110,7 @@ static bool bsc_unst_sort(unsigned char * T, unsigned int * P, unsigned int * co
     return failBack;
 }
 
-static void bsc_unst_reconstruct_case1(unsigned char * T, unsigned int * P, unsigned int * count, int n, int start)
+static void bsc_unst_reconstruct_case1_serial(unsigned char * T, unsigned int * P, unsigned int * count, int n, int start)
 {
     unsigned int index[ALPHABET_SIZE];
              int group[ALPHABET_SIZE];
@@ -1222,7 +1147,7 @@ static void bsc_unst_reconstruct_case1(unsigned char * T, unsigned int * P, unsi
     }
 }
 
-static void bsc_unst_reconstruct_case2(unsigned char * T, unsigned int * P, unsigned int * count, int n, int start)
+static void bsc_unst_reconstruct_case2_serial(unsigned char * T, unsigned int * P, unsigned int * count, int n, int start)
 {
     unsigned int index[ALPHABET_SIZE];
              int group[ALPHABET_SIZE];
@@ -1262,13 +1187,12 @@ static void bsc_unst_reconstruct_case2(unsigned char * T, unsigned int * P, unsi
 
 static INLINE int bsc_unst_search(int index, unsigned int * p, unsigned int v)
 {
-    while (p[index + 1] <= v) index++;
-    return index;
+    while (p[index] <= v) index++; return index;
 }
 
 #define ST_NUM_FASTBITS (10)
 
-static void bsc_unst_reconstruct_case3(unsigned char * T, unsigned int * P, unsigned int * count, int n, int start)
+static void bsc_unst_reconstruct_case3_serial(unsigned char * T, unsigned int * P, unsigned int * count, int n, int start)
 {
     unsigned char   fastbits[1 << ST_NUM_FASTBITS];
     unsigned int    index[ALPHABET_SIZE];
@@ -1297,14 +1221,12 @@ static void bsc_unst_reconstruct_case3(unsigned char * T, unsigned int * P, unsi
         int shift = 0; while (((n - 1) >> shift) >= (1 << ST_NUM_FASTBITS)) shift++;
 
         {
-            memcpy(index, count, ALPHABET_SIZE * sizeof(unsigned int));
-
             for (int v = 0, c = 0; c < ALPHABET_SIZE; ++c)
             {
-                int sum = (c + 1 < ALPHABET_SIZE) ? index[c + 1] : n;
-                if ((int)index[c] != sum)
+                index[c] = (c + 1 < ALPHABET_SIZE) ? count[c + 1] : n;
+                if (count[c] != index[c])
                 {
-                    for (; v <= (int)((sum - 1) >> shift); ++v) fastbits[v] = c;
+                    for (; v <= (int)((index[c] - 1) >> shift); ++v) fastbits[v] = c;
                 }
             }
         }
@@ -1332,12 +1254,258 @@ static void bsc_unst_reconstruct_case3(unsigned char * T, unsigned int * P, unsi
     }
 }
 
-static void bsc_unst_reconstruct(unsigned char * T, unsigned int * P, unsigned int * count, int n, int index, bool failBack)
+static void bsc_unst_reconstruct_serial(unsigned char * T, unsigned int * P, unsigned int * count, int n, int index, bool failBack)
 {
-    if (n < 0x800000)   return bsc_unst_reconstruct_case1(T, P, count, n, index);
-    if (!failBack)      return bsc_unst_reconstruct_case2(T, P, count, n, index);
-    if (failBack)       return bsc_unst_reconstruct_case3(T, P, count, n, index);
+    if (n < 0x800000)   return bsc_unst_reconstruct_case1_serial(T, P, count, n, index);
+    if (!failBack)      return bsc_unst_reconstruct_case2_serial(T, P, count, n, index);
+    if (failBack)       return bsc_unst_reconstruct_case3_serial(T, P, count, n, index);
 }
+
+#ifdef LIBBSC_OPENMP
+
+static bool bsc_unst_sort_parallel(unsigned char * T, unsigned int * P, unsigned int * count, unsigned int * bucket, int n, int k)
+{
+    bool failBack = false;
+    {
+        #pragma omp parallel
+        {
+            unsigned int count_local[ALPHABET_SIZE];
+
+            memset(count_local, 0, ALPHABET_SIZE * sizeof(unsigned int));
+
+            #pragma omp for schedule(static) nowait
+            for (int i = 0; i < n; ++i) count_local[T[i]]++;
+
+            #pragma omp critical
+            for (int c = 0; c < ALPHABET_SIZE; ++c) count[c] += count_local[c];
+        }
+
+        for (int sum = 0, c = 0; c < ALPHABET_SIZE; ++c)
+        {
+            if (count[c] >= 0x800000) failBack = true;
+            int tmp = sum; sum += count[c]; count[c] = tmp;
+        }
+
+        #pragma omp parallel for schedule(static, 1)
+        for (int c = 0; c < ALPHABET_SIZE; ++c)
+        {
+            int start = count[c], end = (c + 1 < ALPHABET_SIZE) ? count[c + 1] : n;
+            if (start != end)
+            {
+                unsigned int * bucket_p = &bucket[c << 8];
+                for (int i = start; i < end; ++i) bucket_p[T[i]]++;
+            }
+        }
+    }
+
+    for (int sum = 0, C0 = 0; C0 < ALPHABET_SIZE; ++C0)
+    {
+        for (int C1 = 0; C1 < ALPHABET_SIZE; ++C1)
+        {
+            if (bucket[(C1 << 8) | C0] > 0)
+            {
+                P[sum] = 0x80000000; sum += bucket[(C1 << 8) | C0];
+            }
+        }
+    }
+
+    {
+        unsigned int index[ALPHABET_SIZE];
+
+        memcpy(index, count, ALPHABET_SIZE * sizeof(unsigned int));
+        for (int C0 = 0; C0 < ALPHABET_SIZE; ++C0)
+        {
+            unsigned int * bucket_p = &bucket[C0 << 8];
+            for (int C1 = 0; C1 < ALPHABET_SIZE; ++C1)
+            {
+                int tmp = index[C1]; index[C1] += bucket_p[C1]; bucket_p[C1] = tmp;
+            }
+        }
+    }
+
+    unsigned int mask0 = 0x80000000, mask1 = 0x40000000;
+    for (int round = 3; round < k; ++round, mask0 >>= 1, mask1 >>= 1)
+    {
+        #pragma omp parallel for schedule(static, 1)
+        for (int c = 0; c < ALPHABET_SIZE; ++c)
+        {
+            unsigned int index[ALPHABET_SIZE]; memcpy(index, &bucket[c << 8], ALPHABET_SIZE * sizeof(unsigned int));
+                     int group[ALPHABET_SIZE]; memset(group, 0xff, ALPHABET_SIZE * sizeof(int));
+
+            int start = count[c], end = (c + 1 < ALPHABET_SIZE) ? count[c + 1] : n;
+            for (int g = 0, i = start; i < end; ++i)
+            {
+                if (P[i] & mask0) g = i;
+
+                unsigned char c = T[i];
+                if (group[c] != g)
+                {
+                    group[c] = g; P[index[c]] += mask1;
+                }
+                index[c]++;
+            }
+        }
+    }
+
+    return failBack;
+}
+
+static void bsc_unst_reconstruct_case1_parallel(unsigned char * T, unsigned int * P, unsigned int * count, unsigned int * bucket, int n, int start)
+{
+    #pragma omp parallel for schedule(static, 1)
+    for (int c = 0; c < ALPHABET_SIZE; ++c)
+    {
+        unsigned int index[ALPHABET_SIZE]; memcpy(index, &bucket[c << 8], ALPHABET_SIZE * sizeof(unsigned int));
+                 int group[ALPHABET_SIZE]; memset(group, 0xff, ALPHABET_SIZE * sizeof(int));
+
+        int start = count[c], end = (c + 1 < ALPHABET_SIZE) ? count[c + 1] : n;
+        for (int g = 0, i = start; i < end; ++i)
+        {
+            if (P[i] > 0) g = i;
+
+            unsigned char c = T[i];
+            if (group[c] < g)
+            {
+                group[c] = i; P[i] = (c << 24) | index[c];
+            }
+            else
+            {
+                P[i] = (c << 24) | 0x800000 | group[c]; P[group[c]]++;
+            }
+            index[c]++;
+        }
+    }
+
+    for (int p = start, i = n - 1; i >= 0; --i)
+    {
+        unsigned int u = P[p];
+        if (u & 0x800000)
+        {
+            p = u & 0x7fffff;
+            u = P[p];
+        }
+
+        T[i] = u >> 24; P[p]--; p = u & 0x7fffff;
+    }
+}
+
+static void bsc_unst_reconstruct_case2_parallel(unsigned char * T, unsigned int * P, unsigned int * count, unsigned int * bucket, int n, int start)
+{
+    #pragma omp parallel for schedule(static, 1)
+    for (int c = 0; c < ALPHABET_SIZE; ++c)
+    {
+        unsigned int index[ALPHABET_SIZE]; memcpy(index, &bucket[c << 8], ALPHABET_SIZE * sizeof(unsigned int));
+                 int group[ALPHABET_SIZE]; memset(group, 0xff, ALPHABET_SIZE * sizeof(int));
+
+        for (int i = 0; i < ALPHABET_SIZE; ++i) index[i] -= count[i];
+
+        int start = count[c], end = (c + 1 < ALPHABET_SIZE) ? count[c + 1] : n;
+        for (int g = 0, i = start; i < end; ++i)
+        {
+            if (P[i] > 0) g = i;
+
+            unsigned char c = T[i];
+            if (group[c] < g)
+            {
+                group[c] = i; P[i] = (c << 24) | index[c];
+            }
+            else
+            {
+                P[i] = (c << 24) | 0x800000 | (i - group[c]); P[group[c]]++;
+            }
+            index[c]++;
+        }
+    }
+
+    for (int p = start, i = n - 1; i >= 0; --i)
+    {
+        unsigned int u = P[p];
+        if (u & 0x800000)
+        {
+            p = p - (u & 0x7fffff);
+            u = P[p];
+        }
+
+        unsigned char c = u >> 24;
+        T[i] = c; P[p]--; p = (u & 0x7fffff) + count[c];
+    }
+}
+
+static void bsc_unst_reconstruct_case3_parallel(unsigned char * T, unsigned int * P, unsigned int * count, unsigned int * bucket, int n, int start)
+{
+    #pragma omp parallel for schedule(static, 1)
+    for (int c = 0; c < ALPHABET_SIZE; ++c)
+    {
+        unsigned int index[ALPHABET_SIZE]; memcpy(index, &bucket[c << 8], ALPHABET_SIZE * sizeof(unsigned int));
+                 int group[ALPHABET_SIZE]; memset(group, 0xff, ALPHABET_SIZE * sizeof(int));
+
+        int start = count[c], end = (c + 1 < ALPHABET_SIZE) ? count[c + 1] : n;
+        for (int g = 0, i = start; i < end; ++i)
+        {
+            if (P[i] > 0) g = i;
+
+            unsigned char c = T[i];
+            if (group[c] < g)
+            {
+                group[c] = i; P[i] = index[c];
+            }
+            else
+            {
+                P[i] = 0x80000000 | group[c]; P[group[c]]++;
+            }
+            index[c]++;
+        }
+    }
+
+
+    unsigned char   fastbits[1 << ST_NUM_FASTBITS];
+    unsigned int    index[ALPHABET_SIZE];
+
+    {
+        int shift = 0; while (((n - 1) >> shift) >= (1 << ST_NUM_FASTBITS)) shift++;
+
+        {
+            for (int v = 0, c = 0; c < ALPHABET_SIZE; ++c)
+            {
+                index[c] = (c + 1 < ALPHABET_SIZE) ? count[c + 1] : n;
+                if (count[c] != index[c])
+                {
+                    for (; v <= (int)((index[c] - 1) >> shift); ++v) fastbits[v] = c;
+                }
+            }
+        }
+
+        if (P[start] & 0x80000000)
+        {
+            start = P[start] & 0x7fffffff;
+        }
+
+        T[0] = bsc_unst_search(fastbits[start >> shift], index, start);
+        P[start]--; start = P[start] + 1;
+
+        for (int p = start, i = n - 1; i >= 1; --i)
+        {
+            unsigned int u = P[p];
+            if (u & 0x80000000)
+            {
+                p = u & 0x7fffffff;
+                u = P[p];
+            }
+
+            T[i] = bsc_unst_search(fastbits[p >> shift], index, p);
+            P[p]--; p = u;
+        }
+    }
+}
+
+static void bsc_unst_reconstruct_parallel(unsigned char * T, unsigned int * P, unsigned int * count, unsigned int * bucket, int n, int index, bool failBack)
+{
+    if (n < 0x800000)   return bsc_unst_reconstruct_case1_parallel(T, P, count, bucket, n, index);
+    if (!failBack)      return bsc_unst_reconstruct_case2_parallel(T, P, count, bucket, n, index);
+    if (failBack)       return bsc_unst_reconstruct_case3_parallel(T, P, count, bucket, n, index);
+}
+
+#endif
 
 int bsc_st3_decode(unsigned char * T, int n, int index, int features)
 {
@@ -1350,14 +1518,27 @@ int bsc_st3_decode(unsigned char * T, int n, int index, int features)
         return LIBBSC_NO_ERROR;
     }
 
-    if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
+    if (unsigned int * P = (unsigned int *)bsc_zero_malloc(n * sizeof(unsigned int)))
     {
-        if (unsigned int * bucket = (unsigned int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
+        if (unsigned int * bucket = (unsigned int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
         {
-            unsigned int count[ALPHABET_SIZE];
+            unsigned int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(unsigned int));
 
-            bool failBack = bsc_unst_sort(T, P, count, bucket, n, 3);
-            bsc_unst_reconstruct(T, P, count, n, index, failBack);
+#ifdef LIBBSC_OPENMP
+
+            if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
+            {
+                bool failBack = bsc_unst_sort_parallel(T, P, count, bucket, n, 3);
+                bsc_unst_reconstruct_parallel(T, P, count, bucket, n, index, failBack);
+            }
+            else
+
+#endif
+
+            {
+                bool failBack = bsc_unst_sort_serial(T, P, count, bucket, n, 3);
+                bsc_unst_reconstruct_serial(T, P, count, n, index, failBack);
+            }
 
             bsc_free(bucket); bsc_free(P);
             return LIBBSC_NO_ERROR;
@@ -1379,14 +1560,27 @@ int bsc_st4_decode(unsigned char * T, int n, int index, int features)
         return LIBBSC_NO_ERROR;
     }
 
-    if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
+    if (unsigned int * P = (unsigned int *)bsc_zero_malloc(n * sizeof(unsigned int)))
     {
-        if (unsigned int * bucket = (unsigned int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
+        if (unsigned int * bucket = (unsigned int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
         {
-            unsigned int count[ALPHABET_SIZE];
+            unsigned int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(unsigned int));
 
-            bool failBack = bsc_unst_sort(T, P, count, bucket, n, 4);
-            bsc_unst_reconstruct(T, P, count, n, index, failBack);
+#ifdef LIBBSC_OPENMP
+
+            if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
+            {
+                bool failBack = bsc_unst_sort_parallel(T, P, count, bucket, n, 4);
+                bsc_unst_reconstruct_parallel(T, P, count, bucket, n, index, failBack);
+            }
+            else
+
+#endif
+
+            {
+                bool failBack = bsc_unst_sort_serial(T, P, count, bucket, n, 4);
+                bsc_unst_reconstruct_serial(T, P, count, n, index, failBack);
+            }
 
             bsc_free(bucket); bsc_free(P);
             return LIBBSC_NO_ERROR;
@@ -1408,14 +1602,27 @@ int bsc_st5_decode(unsigned char * T, int n, int index, int features)
         return LIBBSC_NO_ERROR;
     }
 
-    if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
+    if (unsigned int * P = (unsigned int *)bsc_zero_malloc(n * sizeof(unsigned int)))
     {
-        if (unsigned int * bucket = (unsigned int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
+        if (unsigned int * bucket = (unsigned int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
         {
-            unsigned int count[ALPHABET_SIZE];
+            unsigned int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(unsigned int));
 
-            bool failBack = bsc_unst_sort(T, P, count, bucket, n, 5);
-            bsc_unst_reconstruct(T, P, count, n, index, failBack);
+#ifdef LIBBSC_OPENMP
+
+            if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
+            {
+                bool failBack = bsc_unst_sort_parallel(T, P, count, bucket, n, 5);
+                bsc_unst_reconstruct_parallel(T, P, count, bucket, n, index, failBack);
+            }
+            else
+
+#endif
+
+            {
+                bool failBack = bsc_unst_sort_serial(T, P, count, bucket, n, 5);
+                bsc_unst_reconstruct_serial(T, P, count, n, index, failBack);
+            }
 
             bsc_free(bucket); bsc_free(P);
             return LIBBSC_NO_ERROR;
@@ -1437,14 +1644,27 @@ int bsc_st6_decode(unsigned char * T, int n, int index, int features)
         return LIBBSC_NO_ERROR;
     }
 
-    if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
+    if (unsigned int * P = (unsigned int *)bsc_zero_malloc(n * sizeof(unsigned int)))
     {
-        if (unsigned int * bucket = (unsigned int *)bsc_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
+        if (unsigned int * bucket = (unsigned int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
         {
-            unsigned int count[ALPHABET_SIZE];
+            unsigned int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(unsigned int));
 
-            bool failBack = bsc_unst_sort(T, P, count, bucket, n, 6);
-            bsc_unst_reconstruct(T, P, count, n, index, failBack);
+#ifdef LIBBSC_OPENMP
+
+            if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
+            {
+                bool failBack = bsc_unst_sort_parallel(T, P, count, bucket, n, 6);
+                bsc_unst_reconstruct_parallel(T, P, count, bucket, n, index, failBack);
+            }
+            else
+
+#endif
+
+            {
+                bool failBack = bsc_unst_sort_serial(T, P, count, bucket, n, 6);
+                bsc_unst_reconstruct_serial(T, P, count, n, index, failBack);
+            }
 
             bsc_free(bucket); bsc_free(P);
             return LIBBSC_NO_ERROR;

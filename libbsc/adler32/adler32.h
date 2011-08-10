@@ -41,11 +41,12 @@ extern "C" {
 
     /**
     * Calculates Adler-32 checksum for input memory block.
-    * @param T - the input memory block of n bytes.
-    * @param n - the length of the input memory block.
-    * @return The value of cyclic redundancy check.
+    * @param T          - the input memory block of n bytes.
+    * @param n          - the length of the input memory block.
+    * @param features   - the set of additional features.
+    * @return the value of cyclic redundancy check.
     */
-    unsigned int bsc_adler32(const unsigned char * T, int n);
+    unsigned int bsc_adler32(const unsigned char * T, int n, int features);
 
 #ifdef __cplusplus
 }

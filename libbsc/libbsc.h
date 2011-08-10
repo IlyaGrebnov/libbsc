@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com> 
+Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -71,6 +71,7 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #define LIBBSC_FEATURE_NONE            0
 #define LIBBSC_FEATURE_FASTMODE        1
 #define LIBBSC_FEATURE_MULTITHREADING  2
+#define LIBBSC_FEATURE_LARGEPAGES      4
 
 #define LIBBSC_DEFAULT_LZPHASHSIZE     16
 #define LIBBSC_DEFAULT_LZPMINLEN       128
@@ -85,51 +86,53 @@ extern "C" {
 
     /**
     * You should call this function before you call any of the other functions in libbsc.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
     int bsc_init(int features);
 
     /**
     * Compress a memory block.
-    * @param input - the input memory block of n bytes.
-    * @param output - the output memory block of n + LIBBSC_HEADER_SIZE bytes.
-    * @param n - the length of the input memory block.
-    * @param lzpHashSize[0, 10..28] - the hash table size if LZP enabled, 0 otherwise.
-    * @param lzpMinLen[0, 4..255] - the minimum match length if LZP enabled, 0 otherwise.
-    * @param blockSorter[ST3, ST4, ST5, BWT] - block sorting algorithm.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
-    * @return The length of compressed memory block if no error occurred, error code otherwise.
+    * @param input                              - the input memory block of n bytes.
+    * @param output                             - the output memory block of n + LIBBSC_HEADER_SIZE bytes.
+    * @param n                                  - the length of the input memory block.
+    * @param lzpHashSize[0, 10..28]             - the hash table size if LZP enabled, 0 otherwise.
+    * @param lzpMinLen[0, 4..255]               - the minimum match length if LZP enabled, 0 otherwise.
+    * @param blockSorter[ST3, ST4, ST5, BWT]    - block sorting algorithm.
+    * @param features                           - the set of additional features.
+    * @return the length of compressed memory block if no error occurred, error code otherwise.
     */
     int bsc_compress(const unsigned char * input, unsigned char * output, int n, int lzpHashSize, int lzpMinLen, int blockSorter, int features);
 
     /**
     * Store a memory block.
-    * @param input - the input memory block of n bytes.
-    * @param output - the output memory block of n + LIBBSC_HEADER_SIZE bytes.
-    * @param n - the length of the input memory block.
-    * @return The length of stored memory block if no error occurred, error code otherwise.
+    * @param input                              - the input memory block of n bytes.
+    * @param output                             - the output memory block of n + LIBBSC_HEADER_SIZE bytes.
+    * @param n                                  - the length of the input memory block.
+    * @param features                           - the set of additional features.
+    * @return the length of stored memory block if no error occurred, error code otherwise.
     */
-    int bsc_store(const unsigned char * input, unsigned char * output, int n);
+    int bsc_store(const unsigned char * input, unsigned char * output, int n, int features);
 
     /**
     * Determinate the sizes of input and output memory blocks for bsc_decompress function.
-    * @param blockHeader - the header of input(compressed) memory block of headerSize bytes.
-    * @param headerSize - the length of header, should be at least LIBBSC_HEADER_SIZE bytes.
-    * @param pBlockSize[out] - the length of the input memory block for bsc_decompress function.
-    * @param pDataSize[out] - the length of the output memory block for bsc_decompress function.
+    * @param blockHeader                        - the header of input(compressed) memory block of headerSize bytes.
+    * @param headerSize                         - the length of header, should be at least LIBBSC_HEADER_SIZE bytes.
+    * @param pBlockSize[out]                    - the length of the input memory block for bsc_decompress function.
+    * @param pDataSize[out]                     - the length of the output memory block for bsc_decompress function.
+    * @param features                           - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
-    int bsc_block_info(const unsigned char * blockHeader, int headerSize, int * pBlockSize, int * pDataSize);
+    int bsc_block_info(const unsigned char * blockHeader, int headerSize, int * pBlockSize, int * pDataSize, int features);
 
     /**
     * Decompress a memory block.
     * Note : You should call bsc_block_info function to determinate the sizes of input and output memory blocks.
-    * @param input - the input memory block of inputSize bytes.
-    * @param inputSize - the length of the input memory block.
-    * @param output - the output memory block of outputSize bytes.
-    * @param outputSize - the length of the output memory block.
-    * @param features - the set of additional features, can be LIBBSC_FEATURE_NONE.
+    * @param input                              - the input memory block of inputSize bytes.
+    * @param inputSize                          - the length of the input memory block.
+    * @param output                             - the output memory block of outputSize bytes.
+    * @param outputSize                         - the length of the output memory block.
+    * @param features                           - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
     int bsc_decompress(const unsigned char * input, int inputSize, unsigned char * output, int outputSize, int features);
