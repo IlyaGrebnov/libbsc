@@ -54,8 +54,13 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #define LIBBSC_BAD_PARAMETER          -1
 #define LIBBSC_NOT_ENOUGH_MEMORY      -2
 #define LIBBSC_NOT_COMPRESSIBLE       -3
-#define LIBBSC_UNEXPECTED_EOB         -4
-#define LIBBSC_DATA_CORRUPT           -5
+#define LIBBSC_NOT_SUPPORTED          -4
+#define LIBBSC_UNEXPECTED_EOB         -5
+#define LIBBSC_DATA_CORRUPT           -6
+
+#define LIBBSC_GPU_ERROR              -7
+#define LIBBSC_GPU_NOT_SUPPORTED      -8
+#define LIBBSC_GPU_NOT_ENOUGH_MEMORY  -9
 
 #define LIBBSC_BLOCKSORTER_BWT         1
 
@@ -65,6 +70,8 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
   #define LIBBSC_BLOCKSORTER_ST4       3
   #define LIBBSC_BLOCKSORTER_ST5       4
   #define LIBBSC_BLOCKSORTER_ST6       5
+  #define LIBBSC_BLOCKSORTER_ST7       6
+  #define LIBBSC_BLOCKSORTER_ST8       7
 
 #endif
 
@@ -72,6 +79,7 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #define LIBBSC_FEATURE_FASTMODE        1
 #define LIBBSC_FEATURE_MULTITHREADING  2
 #define LIBBSC_FEATURE_LARGEPAGES      4
+#define LIBBSC_FEATURE_CUDA            8
 
 #define LIBBSC_DEFAULT_LZPHASHSIZE     16
 #define LIBBSC_DEFAULT_LZPMINLEN       128
@@ -98,7 +106,7 @@ extern "C" {
     * @param n                                  - the length of the input memory block.
     * @param lzpHashSize[0, 10..28]             - the hash table size if LZP enabled, 0 otherwise.
     * @param lzpMinLen[0, 4..255]               - the minimum match length if LZP enabled, 0 otherwise.
-    * @param blockSorter[ST3, ST4, ST5, BWT]    - block sorting algorithm.
+    * @param blockSorter[ST3..ST8, BWT]         - block sorting algorithm.
     * @param features                           - the set of additional features.
     * @return the length of compressed memory block if no error occurred, error code otherwise.
     */

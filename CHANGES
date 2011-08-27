@@ -1,3 +1,7 @@
+Changes in 3.0.0 (August 26, 2011)
+- NVIDIA GPU acceleration of forward ST algorithms
+- Added Sort Transform of order 7 & 8 (GPU only)
+
 Changes in 2.8.0 (August 8, 2011)
 - Added parallel version of LZP algorithm
 - Large RAM pages (2 MB) support for Windows

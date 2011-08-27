@@ -66,6 +66,7 @@ int bsc_init(int features)
 
     if (result == LIBBSC_NO_ERROR) result = bsc_platform_init(features);
     if (result == LIBBSC_NO_ERROR) result = bsc_qlfc_init(features);
+    if (result == LIBBSC_NO_ERROR) result = bsc_st_init(features);
 
     return result;
 }
@@ -92,12 +93,14 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
     {
         case LIBBSC_BLOCKSORTER_BWT : mode = LIBBSC_BLOCKSORTER_BWT; break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 
         case LIBBSC_BLOCKSORTER_ST3 : mode = LIBBSC_BLOCKSORTER_ST3; break;
         case LIBBSC_BLOCKSORTER_ST4 : mode = LIBBSC_BLOCKSORTER_ST4; break;
         case LIBBSC_BLOCKSORTER_ST5 : mode = LIBBSC_BLOCKSORTER_ST5; break;
         case LIBBSC_BLOCKSORTER_ST6 : mode = LIBBSC_BLOCKSORTER_ST6; break;
+        case LIBBSC_BLOCKSORTER_ST7 : mode = LIBBSC_BLOCKSORTER_ST7; break;
+        case LIBBSC_BLOCKSORTER_ST8 : mode = LIBBSC_BLOCKSORTER_ST8; break;
 
 #endif
 
@@ -153,12 +156,14 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
     {
         case LIBBSC_BLOCKSORTER_BWT : index = bsc_bwt_encode(data, lzSize, &num_indexes, indexes, features); break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 
-        case LIBBSC_BLOCKSORTER_ST3 : index = bsc_st3_encode(data, lzSize, features); break;
-        case LIBBSC_BLOCKSORTER_ST4 : index = bsc_st4_encode(data, lzSize, features); break;
-        case LIBBSC_BLOCKSORTER_ST5 : index = bsc_st5_encode(data, lzSize, features); break;
-        case LIBBSC_BLOCKSORTER_ST6 : index = bsc_st6_encode(data, lzSize, features); break;
+        case LIBBSC_BLOCKSORTER_ST3 : index = bsc_st_encode(data, lzSize, 3, features); break;
+        case LIBBSC_BLOCKSORTER_ST4 : index = bsc_st_encode(data, lzSize, 4, features); break;
+        case LIBBSC_BLOCKSORTER_ST5 : index = bsc_st_encode(data, lzSize, 5, features); break;
+        case LIBBSC_BLOCKSORTER_ST6 : index = bsc_st_encode(data, lzSize, 6, features); break;
+        case LIBBSC_BLOCKSORTER_ST7 : index = bsc_st_encode(data, lzSize, 7, features); break;
+        case LIBBSC_BLOCKSORTER_ST8 : index = bsc_st_encode(data, lzSize, 8, features); break;
 
 #endif
 
@@ -216,12 +221,14 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
     {
         case LIBBSC_BLOCKSORTER_BWT : mode = LIBBSC_BLOCKSORTER_BWT; break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 
         case LIBBSC_BLOCKSORTER_ST3 : mode = LIBBSC_BLOCKSORTER_ST3; break;
         case LIBBSC_BLOCKSORTER_ST4 : mode = LIBBSC_BLOCKSORTER_ST4; break;
         case LIBBSC_BLOCKSORTER_ST5 : mode = LIBBSC_BLOCKSORTER_ST5; break;
         case LIBBSC_BLOCKSORTER_ST6 : mode = LIBBSC_BLOCKSORTER_ST6; break;
+        case LIBBSC_BLOCKSORTER_ST7 : mode = LIBBSC_BLOCKSORTER_ST7; break;
+        case LIBBSC_BLOCKSORTER_ST8 : mode = LIBBSC_BLOCKSORTER_ST8; break;
 
 #endif
 
@@ -271,12 +278,14 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
     {
         case LIBBSC_BLOCKSORTER_BWT : index = bsc_bwt_encode(output, lzSize, &num_indexes, indexes, features); break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 
-        case LIBBSC_BLOCKSORTER_ST3 : index = bsc_st3_encode(output, lzSize, features); break;
-        case LIBBSC_BLOCKSORTER_ST4 : index = bsc_st4_encode(output, lzSize, features); break;
-        case LIBBSC_BLOCKSORTER_ST5 : index = bsc_st5_encode(output, lzSize, features); break;
-        case LIBBSC_BLOCKSORTER_ST6 : index = bsc_st6_encode(output, lzSize, features); break;
+        case LIBBSC_BLOCKSORTER_ST3 : index = bsc_st_encode(output, lzSize, 3, features); break;
+        case LIBBSC_BLOCKSORTER_ST4 : index = bsc_st_encode(output, lzSize, 4, features); break;
+        case LIBBSC_BLOCKSORTER_ST5 : index = bsc_st_encode(output, lzSize, 5, features); break;
+        case LIBBSC_BLOCKSORTER_ST6 : index = bsc_st_encode(output, lzSize, 6, features); break;
+        case LIBBSC_BLOCKSORTER_ST7 : index = bsc_st_encode(output, lzSize, 7, features); break;
+        case LIBBSC_BLOCKSORTER_ST8 : index = bsc_st_encode(output, lzSize, 8, features); break;
 
 #endif
 
@@ -352,12 +361,14 @@ int bsc_block_info(const unsigned char * blockHeader, int headerSize, int * pBlo
     {
         case LIBBSC_BLOCKSORTER_BWT : test_mode = LIBBSC_BLOCKSORTER_BWT; break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 
         case LIBBSC_BLOCKSORTER_ST3 : test_mode = LIBBSC_BLOCKSORTER_ST3; break;
         case LIBBSC_BLOCKSORTER_ST4 : test_mode = LIBBSC_BLOCKSORTER_ST4; break;
         case LIBBSC_BLOCKSORTER_ST5 : test_mode = LIBBSC_BLOCKSORTER_ST5; break;
         case LIBBSC_BLOCKSORTER_ST6 : test_mode = LIBBSC_BLOCKSORTER_ST6; break;
+        case LIBBSC_BLOCKSORTER_ST7 : test_mode = LIBBSC_BLOCKSORTER_ST7; break;
+        case LIBBSC_BLOCKSORTER_ST8 : test_mode = LIBBSC_BLOCKSORTER_ST8; break;
 
 #endif
 
@@ -452,12 +463,14 @@ int bsc_decompress_inplace(unsigned char * data, int inputSize, int outputSize, 
     {
         case LIBBSC_BLOCKSORTER_BWT : result = bsc_bwt_decode(data, lzSize, index, num_indexes, indexes, features); break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 
-        case LIBBSC_BLOCKSORTER_ST3 : result = bsc_st3_decode(data, lzSize, index, features); break;
-        case LIBBSC_BLOCKSORTER_ST4 : result = bsc_st4_decode(data, lzSize, index, features); break;
-        case LIBBSC_BLOCKSORTER_ST5 : result = bsc_st5_decode(data, lzSize, index, features); break;
-        case LIBBSC_BLOCKSORTER_ST6 : result = bsc_st6_decode(data, lzSize, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST3 : result = bsc_st_decode(data, lzSize, 3, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST4 : result = bsc_st_decode(data, lzSize, 4, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST5 : result = bsc_st_decode(data, lzSize, 5, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST6 : result = bsc_st_decode(data, lzSize, 6, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST7 : result = bsc_st_decode(data, lzSize, 7, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST8 : result = bsc_st_decode(data, lzSize, 8, index, features); break;
 
 #endif
 
@@ -544,12 +557,14 @@ int bsc_decompress(const unsigned char * input, int inputSize, unsigned char * o
     {
         case LIBBSC_BLOCKSORTER_BWT : result = bsc_bwt_decode(output, lzSize, index, num_indexes, indexes, features); break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 
-        case LIBBSC_BLOCKSORTER_ST3 : result = bsc_st3_decode(output, lzSize, index, features); break;
-        case LIBBSC_BLOCKSORTER_ST4 : result = bsc_st4_decode(output, lzSize, index, features); break;
-        case LIBBSC_BLOCKSORTER_ST5 : result = bsc_st5_decode(output, lzSize, index, features); break;
-        case LIBBSC_BLOCKSORTER_ST6 : result = bsc_st6_decode(output, lzSize, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST3 : result = bsc_st_decode(output, lzSize, 3, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST4 : result = bsc_st_decode(output, lzSize, 4, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST5 : result = bsc_st_decode(output, lzSize, 5, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST6 : result = bsc_st_decode(output, lzSize, 6, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST7 : result = bsc_st_decode(output, lzSize, 7, index, features); break;
+        case LIBBSC_BLOCKSORTER_ST8 : result = bsc_st_decode(output, lzSize, 8, index, features); break;
 
 #endif
 

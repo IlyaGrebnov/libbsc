@@ -53,11 +53,6 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-
-#ifdef _OPENMP
-  #include <omp.h>
-#endif
-
 #include <math.h>
 #include <memory.h>
 
@@ -69,7 +64,7 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 #define LIBBSC_CONTEXTS_AUTODETECT   3
 
-unsigned char bscFileSign[4] = {'b', 's', 'c', 0x28};
+unsigned char bscFileSign[4] = {'b', 's', 'c', 0x30};
 
 typedef struct BSC_BLOCK_HEADER
 {
@@ -83,6 +78,7 @@ int paramEnableSegmentation       = 0;
 int paramEnableReordering         = 0;
 int paramEnableLargePages         = 0;
 int paramEnableFastMode           = 0;
+int paramEnableCUDA               = 0;
 int paramEnableLZP                = 1;
 int paramLZPHashSize              = 16;
 int paramLZPMinLen                = 128;
@@ -181,7 +177,7 @@ void Compression(char * argv[])
 
     double startTime = BSC_CLOCK();
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
     int numThreads = 1;
     if (paramEnableParallelProcessing)
@@ -197,19 +193,19 @@ void Compression(char * argv[])
 
     int segmentationStart = 0, segmentationEnd = 0;
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
     #pragma omp parallel num_threads(numThreads) if(numThreads > 1)
 #endif
     {
         unsigned char * buffer = (unsigned char *)bsc_malloc(paramBlockSize + LIBBSC_HEADER_SIZE);
         if (buffer == NULL)
         {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
             #pragma omp critical(print)
 #endif
             {
 
-                fprintf(stderr, "Not enough memory!\n");
+                fprintf(stderr, "Not enough memory! Please check README file for more information.\n");
                 exit(2);
             }
         }
@@ -219,13 +215,13 @@ void Compression(char * argv[])
             BSC_FILEOFFSET  blockOffset     = 0;
             int             dataSize        = 0;
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
             #pragma omp critical(input)
 #endif
             {
                 if ((feof(fInput) == 0) && (BSC_FTELL(fInput) != fileSize))
                 {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                     #pragma omp master
 #endif
                     {
@@ -263,7 +259,7 @@ void Compression(char * argv[])
                             {
                                 switch (segmentationEnd)
                                 {
-                                    case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory!\n"); break;
+                                    case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory! Please check README file for more information.\n"); break;
                                     default                         : fprintf(stderr, "\nInternal program error, please contact the author!\n");
                                 }
                                 exit(2);
@@ -289,13 +285,13 @@ void Compression(char * argv[])
                 recordSize = bsc_detect_recordsize(buffer, dataSize, LIBBSC_FEATURE_FASTMODE);
                 if (recordSize < LIBBSC_NO_ERROR)
                 {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                     #pragma omp critical(print)
 #endif
                     {
                         switch (recordSize)
                         {
-                            case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory!\n"); break;
+                            case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory! Please check README file for more information.\n"); break;
                             default                         : fprintf(stderr, "\nInternal program error, please contact the author!\n");
                         }
                         exit(2);
@@ -306,13 +302,13 @@ void Compression(char * argv[])
                     int result = bsc_reorder_forward(buffer, dataSize, recordSize, paramEnableMultiThreading ? LIBBSC_FEATURE_MULTITHREADING : LIBBSC_FEATURE_NONE);
                     if (result != LIBBSC_NO_ERROR)
                     {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                         #pragma omp critical(print)
 #endif
                         {
                             switch (result)
                             {
-                                case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory!\n"); break;
+                                case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory! Please check README file for more information.\n"); break;
                                 default                         : fprintf(stderr, "\nInternal program error, please contact the author!\n");
                             }
                             exit(2);
@@ -327,7 +323,7 @@ void Compression(char * argv[])
                 sortingContexts = bsc_detect_contextsorder(buffer, dataSize, LIBBSC_FEATURE_FASTMODE);
                 if (sortingContexts < LIBBSC_NO_ERROR)
                 {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                     #pragma omp critical(print)
 #endif
                     {
@@ -345,7 +341,7 @@ void Compression(char * argv[])
                 int result = bsc_reverse_block(buffer, dataSize, paramEnableMultiThreading ? LIBBSC_FEATURE_MULTITHREADING : LIBBSC_FEATURE_NONE);
                 if (result != LIBBSC_NO_ERROR)
                 {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                     #pragma omp critical(print)
 #endif
                     {
@@ -357,13 +353,14 @@ void Compression(char * argv[])
 
             int features =
                 (paramEnableMultiThreading ? LIBBSC_FEATURE_MULTITHREADING : LIBBSC_FEATURE_NONE) |
-                (paramEnableFastMode ? LIBBSC_FEATURE_FASTMODE : LIBBSC_FEATURE_NONE)
+                (paramEnableFastMode       ? LIBBSC_FEATURE_FASTMODE       : LIBBSC_FEATURE_NONE) |
+                (paramEnableCUDA           ? LIBBSC_FEATURE_CUDA           : LIBBSC_FEATURE_NONE)
             ;
 
             int blockSize = bsc_compress(buffer, buffer, dataSize, paramLZPHashSize, paramLZPMinLen, paramBlockSorter, features);
             if (blockSize == LIBBSC_NOT_COMPRESSIBLE)
             {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                 #pragma omp critical(input)
 #endif
                 {
@@ -385,20 +382,25 @@ void Compression(char * argv[])
             }
             if (blockSize < LIBBSC_NO_ERROR)
             {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                 #pragma omp critical(print)
 #endif
                 {
                     switch (blockSize)
                     {
-                        case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory!\n"); break;
-                        default                         : fprintf(stderr, "\nInternal program error, please contact the author!\n");
+                        case LIBBSC_NOT_ENOUGH_MEMORY       : fprintf(stderr, "\nNot enough memory! Please check README file for more information.\n"); break;
+                        case LIBBSC_NOT_SUPPORTED           : fprintf(stderr, "\nSpecified compression method is not supported on this platform!\n"); break;
+                        case LIBBSC_GPU_ERROR               : fprintf(stderr, "\nGeneral GPU failure, please contact the author!\n"); break;
+                        case LIBBSC_GPU_NOT_SUPPORTED       : fprintf(stderr, "\nYour GPU is not supported! Please check README file for more information.\n"); break;
+                        case LIBBSC_GPU_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough GPU memory! Please check README file for more information.\n"); break;
+
+                        default                             : fprintf(stderr, "\nInternal program error, please contact the author!\n");
                     }
                     exit(2);
                 }
             }
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
             #pragma omp critical(output)
 #endif
             {
@@ -485,7 +487,7 @@ void Decompression(char * argv[])
 
     double startTime = BSC_CLOCK();
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
 
     int numThreads = 1;
     if (paramEnableParallelProcessing)
@@ -511,13 +513,13 @@ void Decompression(char * argv[])
             int             blockSize       = 0;
             int             dataSize        = 0;
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
             #pragma omp critical(input)
 #endif
             {
                 if ((feof(fInput) == 0) && (BSC_FTELL(fInput) != fileSize))
                 {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                     #pragma omp master
 #endif
                     {
@@ -573,7 +575,7 @@ void Decompression(char * argv[])
 
                     if (buffer == NULL)
                     {
-                        fprintf(stderr, "\nNot enough memory!\n");
+                        fprintf(stderr, "\nNot enough memory! Please check README file for more information.\n");
                         exit(2);
                     }
 
@@ -592,15 +594,19 @@ void Decompression(char * argv[])
             int result = bsc_decompress(buffer, blockSize, buffer, dataSize, paramEnableMultiThreading ? LIBBSC_FEATURE_MULTITHREADING : LIBBSC_FEATURE_NONE);
             if (result < LIBBSC_NO_ERROR)
             {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                 #pragma omp critical(print)
 #endif
                 {
                     switch (result)
                     {
-                        case LIBBSC_DATA_CORRUPT        : fprintf(stderr, "\nThe compressed data is corrupted!\n"); break;
-                        case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory!\n"); break;
-                        default                         : fprintf(stderr, "\nInternal program error, please contact the author!\n");
+                        case LIBBSC_DATA_CORRUPT            : fprintf(stderr, "\nThe compressed data is corrupted!\n"); break;
+                        case LIBBSC_NOT_ENOUGH_MEMORY       : fprintf(stderr, "\nNot enough memory! Please check README file for more information.\n"); break;
+                        case LIBBSC_GPU_ERROR               : fprintf(stderr, "\nGeneral GPU failure, please contact the author!\n"); break;
+                        case LIBBSC_GPU_NOT_SUPPORTED       : fprintf(stderr, "\nYour GPU is not supported! Please check README file for more information.\n"); break;
+                        case LIBBSC_GPU_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough GPU memory! Please check README file for more information.\n"); break;
+
+                        default                             : fprintf(stderr, "\nInternal program error, please contact the author!\n");
                     }
                     exit(2);
                 }
@@ -611,7 +617,7 @@ void Decompression(char * argv[])
                 result = bsc_reverse_block(buffer, dataSize, paramEnableMultiThreading ? LIBBSC_FEATURE_MULTITHREADING : LIBBSC_FEATURE_NONE);
                 if (result != LIBBSC_NO_ERROR)
                 {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                     #pragma omp critical(print)
 #endif
                     {
@@ -626,13 +632,13 @@ void Decompression(char * argv[])
                 result = bsc_reorder_reverse(buffer, dataSize, recordSize, paramEnableMultiThreading ? LIBBSC_FEATURE_MULTITHREADING : LIBBSC_FEATURE_NONE);
                 if (result != LIBBSC_NO_ERROR)
                 {
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
                     #pragma omp critical(print)
 #endif
                     {
                         switch (result)
                         {
-                            case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory!\n"); break;
+                            case LIBBSC_NOT_ENOUGH_MEMORY   : fprintf(stderr, "\nNot enough memory! Please check README file for more information.\n"); break;
                             default                         : fprintf(stderr, "\nInternal program error, please contact the author!\n");
                         }
                         exit(2);
@@ -640,7 +646,7 @@ void Decompression(char * argv[])
                 }
             }
 
-#ifdef _OPENMP
+#ifdef LIBBSC_OPENMP
             #pragma omp critical(output)
 #endif
             {
@@ -681,13 +687,15 @@ void ShowUsage(void)
     fprintf(stdout, "  -m<algo> Block sorting algorithm, default: -m0\n");
     fprintf(stdout, "             -m0 Burrows Wheeler Transform\n");
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
-
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
     fprintf(stdout, "             -m3 Sort Transform of order 3\n");
     fprintf(stdout, "             -m4 Sort Transform of order 4\n");
     fprintf(stdout, "             -m5 Sort Transform of order 5\n");
     fprintf(stdout, "             -m6 Sort Transform of order 6\n");
-
+  #ifdef LIBBSC_CUDA_SUPPORT
+    fprintf(stdout, "             -m7 Sort Transform of order 7 (GPU only)\n");
+    fprintf(stdout, "             -m8 Sort Transform of order 8 (GPU only)\n");
+  #endif
 #endif
 
     fprintf(stdout, "  -c<ctx>  Contexts for sorting, default: -cf\n");
@@ -705,16 +713,16 @@ void ShowUsage(void)
     fprintf(stdout, "  -p       Disable all preprocessing techniques\n");
 
 #ifdef _WIN32
-
-    fprintf(stdout, "  -P       Enable large RAM pages (2 MB) support, default: disable\n");
-
+    fprintf(stdout, "  -P       Enable Large RAM pages (2 MB) support, default: disable\n");
 #endif
 
-#ifdef _OPENMP
+#ifdef LIBBSC_CUDA_SUPPORT
+    fprintf(stdout, "  -G       Enable NVIDIA GPU acceleration (experimental), default: disable\n");
+#endif
 
+#ifdef LIBBSC_OPENMP
     fprintf(stdout, "  -t       Disable parallel blocks processing, default: enable\n");
     fprintf(stdout, "  -T       Disable multi-core systems support, default: enable\n");
-
 #endif
 
     fprintf(stdout,"\nSwitches may be combined into one, like -b128p\n");
@@ -747,12 +755,15 @@ void ProcessSwitch(char * s)
                     {
                         case 0   : paramBlockSorter = LIBBSC_BLOCKSORTER_BWT; break;
 
-#if defined(LIBBSC_BLOCKSORTER_ST3) && defined(LIBBSC_BLOCKSORTER_ST4) && defined(LIBBSC_BLOCKSORTER_ST5) && defined(LIBBSC_BLOCKSORTER_ST6)
-
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
                         case 3   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST3; break;
                         case 4   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST4; break;
                         case 5   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST5; break;
                         case 6   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST6; break;
+  #ifdef LIBBSC_CUDA_SUPPORT
+                        case 7   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST7; paramEnableCUDA = 1; break;
+                        case 8   : paramBlockSorter = LIBBSC_BLOCKSORTER_ST8; paramEnableCUDA = 1; break;
+  #endif
 #endif
 
                         default  : ShowUsage();
@@ -788,17 +799,22 @@ void ProcessSwitch(char * s)
                     break;
                 }
 
-#ifdef _OPENMP
-            case 't': paramEnableParallelProcessing = 0; break;
-            case 'T': paramEnableParallelProcessing = paramEnableMultiThreading = 0; break;
-#endif
-
             case 'f': paramEnableFastMode       = 1; break;
+
             case 'l': paramEnableLZP            = 1; break;
             case 's': paramEnableSegmentation   = 1; break;
             case 'r': paramEnableReordering     = 1; break;
 
             case 'p': paramEnableLZP = paramEnableSegmentation = paramEnableReordering = 0; break;
+
+#ifdef LIBBSC_OPENMP
+            case 't': paramEnableParallelProcessing = 0; break;
+            case 'T': paramEnableParallelProcessing = paramEnableMultiThreading = 0; break;
+#endif
+
+#ifdef LIBBSC_CUDA_SUPPORT
+            case 'G': paramEnableCUDA           = 1; break;
+#endif
 
 #ifdef _WIN32
             case 'P': paramEnableLargePages     = 1; break;
@@ -831,7 +847,7 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 2.8.0. 8 August 2011.\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.0.0. 26 August 2011.\n");
     fprintf(stdout, "Copyright (c) 2009-2011 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)

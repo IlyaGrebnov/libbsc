@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------*/
 /* Block Sorting, Lossless Data Compression Library.         */
-/* Interface to Sort Transform                               */
+/* Interface to Sort Transform (GPU version)                 */
 /*-----------------------------------------------------------*/
 
 /*--
@@ -47,21 +47,21 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 --*/
 
-#ifndef _LIBBSC_ST_H
-#define _LIBBSC_ST_H
+#ifndef _LIBBSC_ST_CUH
+#define _LIBBSC_ST_CUH
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
+#if defined(LIBBSC_SORT_TRANSFORM_SUPPORT) && defined(LIBBSC_CUDA_SUPPORT)
 
     /**
     * You should call this function before you call any of the other functions in st.
     * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
-    int bsc_st_init(int features);
+    int bsc_st_cuda_init(int features);
 
     /**
     * Constructs the Sort Transform of order k transformed string of a given string.
@@ -71,18 +71,7 @@ extern "C" {
     * @param features   - the set of additional features.
     * @return the primary index if no error occurred, error code otherwise.
     */
-    int bsc_st_encode(unsigned char * T, int n, int k, int features);
-
-    /**
-    * Reconstructs the original string from Sort Transform of order k transformed string.
-    * @param T          - the input/output string of n chars.
-    * @param n          - the length of the given string.
-    * @param k[3..8]    - the order of Sort Transform.
-    * @param index      - the primary index.
-    * @param features   - the set of additional features.
-    * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
-    */
-    int bsc_st_decode(unsigned char * T, int n, int k, int index, int features);
+    int bsc_st_encode_cuda(unsigned char * T, int n, int k, int features);
 
 #endif
 
@@ -93,5 +82,5 @@ extern "C" {
 #endif
 
 /*-----------------------------------------------------------*/
-/* End                                                  st.h */
+/* End                                                st.cuh */
 /*-----------------------------------------------------------*/

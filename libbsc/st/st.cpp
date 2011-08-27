@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------*/
 /* Block Sorting, Lossless Data Compression Library.         */
-/* Sort Transform of order 3, 4, 5 and 6                     */
+/* Sort Transform                                            */
 /*-----------------------------------------------------------*/
 
 /*--
@@ -57,7 +57,18 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #include "../libbsc.h"
 #include "../platform/platform.h"
 
+#include "st.cuh"
+
 #define ALPHABET_SQRT_SIZE  (16)
+
+int bsc_st_init(int features)
+{
+#ifdef LIBBSC_CUDA_SUPPORT
+    return bsc_st_cuda_init(features);
+#else
+    return LIBBSC_NO_ERROR;
+#endif
+}
 
 static int bsc_st3_transform_serial(unsigned char * T, unsigned short * P, int * bucket, int n)
 {
@@ -875,15 +886,6 @@ static int bsc_st6_transform_parallel(unsigned char * T, unsigned int * P, int *
 
 int bsc_st3_encode(unsigned char * T, int n, int features)
 {
-    if ((T == NULL) || (n < 0))
-    {
-        return LIBBSC_BAD_PARAMETER;
-    }
-    if (n <= 1)
-    {
-        return 0;
-    }
-
     if (unsigned short * P = (unsigned short *)bsc_malloc(n * sizeof(unsigned short)))
     {
         if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
@@ -914,15 +916,6 @@ int bsc_st3_encode(unsigned char * T, int n, int features)
 
 int bsc_st4_encode(unsigned char * T, int n, int features)
 {
-    if ((T == NULL) || (n < 0))
-    {
-        return LIBBSC_BAD_PARAMETER;
-    }
-    if (n <= 1)
-    {
-        return 0;
-    }
-
     if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
     {
         if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
@@ -953,15 +946,6 @@ int bsc_st4_encode(unsigned char * T, int n, int features)
 
 int bsc_st5_encode(unsigned char * T, int n, int features)
 {
-    if ((T == NULL) || (n < 0))
-    {
-        return LIBBSC_BAD_PARAMETER;
-    }
-    if (n <= 1)
-    {
-        return 0;
-    }
-
     if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
     {
         if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
@@ -992,15 +976,6 @@ int bsc_st5_encode(unsigned char * T, int n, int features)
 
 int bsc_st6_encode(unsigned char * T, int n, int features)
 {
-    if ((T == NULL) || (n < 0))
-    {
-        return LIBBSC_BAD_PARAMETER;
-    }
-    if (n <= 1)
-    {
-        return 0;
-    }
-
     if (unsigned int * P = (unsigned int *)bsc_malloc(n * sizeof(unsigned int)))
     {
         if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
@@ -1027,6 +1002,30 @@ int bsc_st6_encode(unsigned char * T, int n, int features)
         bsc_free(P);
     };
     return LIBBSC_NOT_ENOUGH_MEMORY;
+}
+
+int bsc_st_encode(unsigned char * T, int n, int k, int features)
+{
+    if ((T == NULL) || (n < 0)) return LIBBSC_BAD_PARAMETER;
+    if ((k < 3) || (k > 8))     return LIBBSC_BAD_PARAMETER;
+    if (n <= 1)                 return 0;
+
+#ifdef LIBBSC_CUDA_SUPPORT
+
+    if (features & LIBBSC_FEATURE_CUDA)
+    {
+        int index = bsc_st_encode_cuda(T, n, k, features);
+        if (index >= LIBBSC_NO_ERROR || k >= 7) return index;
+    }
+
+#endif
+
+    if (k == 3) return bsc_st3_encode(T, n, features);
+    if (k == 4) return bsc_st4_encode(T, n, features);
+    if (k == 5) return bsc_st5_encode(T, n, features);
+    if (k == 6) return bsc_st6_encode(T, n, features);
+
+    return LIBBSC_NOT_SUPPORTED;
 }
 
 static bool bsc_unst_sort_serial(unsigned char * T, unsigned int * P, unsigned int * count, unsigned int * bucket, int n, int k)
@@ -1089,7 +1088,7 @@ static bool bsc_unst_sort_serial(unsigned char * T, unsigned int * P, unsigned i
     }
 
     unsigned int mask0 = 0x80000000, mask1 = 0x40000000;
-    for (int round = 5; round <= k; ++round, mask0 >>= 1, mask1 >>= 1)
+    for (int round = 4; round < k; ++round, mask0 >>= 1, mask1 >>= 1)
     {
         memcpy(index, count, ALPHABET_SIZE * sizeof(unsigned int));
         memset(group, 0xff, ALPHABET_SIZE * sizeof(int));
@@ -1457,7 +1456,6 @@ static void bsc_unst_reconstruct_case3_parallel(unsigned char * T, unsigned int 
         }
     }
 
-
     unsigned char   fastbits[1 << ST_NUM_FASTBITS];
     unsigned int    index[ALPHABET_SIZE];
 
@@ -1507,16 +1505,12 @@ static void bsc_unst_reconstruct_parallel(unsigned char * T, unsigned int * P, u
 
 #endif
 
-int bsc_st3_decode(unsigned char * T, int n, int index, int features)
+int bsc_st_decode(unsigned char * T, int n, int k, int index, int features)
 {
-    if ((T == NULL) || (n < 0) || (index < 0) || (index >= n))
-    {
-        return LIBBSC_BAD_PARAMETER;
-    }
-    if (n <= 1)
-    {
-        return LIBBSC_NO_ERROR;
-    }
+    if ((T == NULL) || (n < 0))      return LIBBSC_BAD_PARAMETER;
+    if ((index < 0) || (index >= n)) return LIBBSC_BAD_PARAMETER;
+    if ((k < 3) || (k > 8))          return LIBBSC_BAD_PARAMETER;
+    if (n <= 1)                      return LIBBSC_NO_ERROR;
 
     if (unsigned int * P = (unsigned int *)bsc_zero_malloc(n * sizeof(unsigned int)))
     {
@@ -1528,7 +1522,7 @@ int bsc_st3_decode(unsigned char * T, int n, int index, int features)
 
             if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
             {
-                bool failBack = bsc_unst_sort_parallel(T, P, count, bucket, n, 3);
+                bool failBack = bsc_unst_sort_parallel(T, P, count, bucket, n, k);
                 bsc_unst_reconstruct_parallel(T, P, count, bucket, n, index, failBack);
             }
             else
@@ -1536,133 +1530,7 @@ int bsc_st3_decode(unsigned char * T, int n, int index, int features)
 #endif
 
             {
-                bool failBack = bsc_unst_sort_serial(T, P, count, bucket, n, 3);
-                bsc_unst_reconstruct_serial(T, P, count, n, index, failBack);
-            }
-
-            bsc_free(bucket); bsc_free(P);
-            return LIBBSC_NO_ERROR;
-        };
-        bsc_free(P);
-    };
-
-    return LIBBSC_NOT_ENOUGH_MEMORY;
-}
-
-int bsc_st4_decode(unsigned char * T, int n, int index, int features)
-{
-    if ((T == NULL) || (n < 0) || (index < 0) || (index >= n))
-    {
-        return LIBBSC_BAD_PARAMETER;
-    }
-    if (n <= 1)
-    {
-        return LIBBSC_NO_ERROR;
-    }
-
-    if (unsigned int * P = (unsigned int *)bsc_zero_malloc(n * sizeof(unsigned int)))
-    {
-        if (unsigned int * bucket = (unsigned int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
-        {
-            unsigned int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(unsigned int));
-
-#ifdef LIBBSC_OPENMP
-
-            if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
-            {
-                bool failBack = bsc_unst_sort_parallel(T, P, count, bucket, n, 4);
-                bsc_unst_reconstruct_parallel(T, P, count, bucket, n, index, failBack);
-            }
-            else
-
-#endif
-
-            {
-                bool failBack = bsc_unst_sort_serial(T, P, count, bucket, n, 4);
-                bsc_unst_reconstruct_serial(T, P, count, n, index, failBack);
-            }
-
-            bsc_free(bucket); bsc_free(P);
-            return LIBBSC_NO_ERROR;
-        };
-        bsc_free(P);
-    };
-
-    return LIBBSC_NOT_ENOUGH_MEMORY;
-}
-
-int bsc_st5_decode(unsigned char * T, int n, int index, int features)
-{
-    if ((T == NULL) || (n < 0) || (index < 0) || (index >= n))
-    {
-        return LIBBSC_BAD_PARAMETER;
-    }
-    if (n <= 1)
-    {
-        return LIBBSC_NO_ERROR;
-    }
-
-    if (unsigned int * P = (unsigned int *)bsc_zero_malloc(n * sizeof(unsigned int)))
-    {
-        if (unsigned int * bucket = (unsigned int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
-        {
-            unsigned int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(unsigned int));
-
-#ifdef LIBBSC_OPENMP
-
-            if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
-            {
-                bool failBack = bsc_unst_sort_parallel(T, P, count, bucket, n, 5);
-                bsc_unst_reconstruct_parallel(T, P, count, bucket, n, index, failBack);
-            }
-            else
-
-#endif
-
-            {
-                bool failBack = bsc_unst_sort_serial(T, P, count, bucket, n, 5);
-                bsc_unst_reconstruct_serial(T, P, count, n, index, failBack);
-            }
-
-            bsc_free(bucket); bsc_free(P);
-            return LIBBSC_NO_ERROR;
-        };
-        bsc_free(P);
-    };
-
-    return LIBBSC_NOT_ENOUGH_MEMORY;
-}
-
-int bsc_st6_decode(unsigned char * T, int n, int index, int features)
-{
-    if ((T == NULL) || (n < 0) || (index < 0) || (index >= n))
-    {
-        return LIBBSC_BAD_PARAMETER;
-    }
-    if (n <= 1)
-    {
-        return LIBBSC_NO_ERROR;
-    }
-
-    if (unsigned int * P = (unsigned int *)bsc_zero_malloc(n * sizeof(unsigned int)))
-    {
-        if (unsigned int * bucket = (unsigned int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(unsigned int)))
-        {
-            unsigned int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(unsigned int));
-
-#ifdef LIBBSC_OPENMP
-
-            if ((features & LIBBSC_FEATURE_MULTITHREADING) && (n >= 64 * 1024))
-            {
-                bool failBack = bsc_unst_sort_parallel(T, P, count, bucket, n, 6);
-                bsc_unst_reconstruct_parallel(T, P, count, bucket, n, index, failBack);
-            }
-            else
-
-#endif
-
-            {
-                bool failBack = bsc_unst_sort_serial(T, P, count, bucket, n, 6);
+                bool failBack = bsc_unst_sort_serial(T, P, count, bucket, n, k);
                 bsc_unst_reconstruct_serial(T, P, count, n, index, failBack);
             }
 
