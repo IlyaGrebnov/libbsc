@@ -66,7 +66,12 @@ int bsc_init(int features)
 
     if (result == LIBBSC_NO_ERROR) result = bsc_platform_init(features);
     if (result == LIBBSC_NO_ERROR) result = bsc_qlfc_init(features);
+
+#ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
+
     if (result == LIBBSC_NO_ERROR) result = bsc_st_init(features);
+
+#endif
 
     return result;
 }
