@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -41,7 +41,7 @@ See also the bsc and libbsc web site:
 #include "../platform/platform.h"
 #include "../libbsc.h"
 
-#define LIBBSC_LZP_MATCH_FLAG   0xF2
+#define LIBBSC_LZP_MATCH_FLAG 	0xf2
 
 static INLINE int bsc_lzp_num_blocks(int n)
 {
@@ -265,8 +265,11 @@ int bsc_lzp_compress_parallel(const unsigned char * input, unsigned char * outpu
         int result    = LIBBSC_NO_ERROR;
         int chunkSize = n / nBlocks;
 
+        int numThreads = omp_get_max_threads();
+        if (numThreads > nBlocks) numThreads = nBlocks;
+
         output[0] = nBlocks;
-        #pragma omp parallel
+        #pragma omp parallel num_threads(numThreads) if(numThreads > 1)
         {
             if (omp_get_num_threads() == 1)
             {

@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -35,7 +35,7 @@ See also the bsc and libbsc web site:
 #ifndef _LIBBSC_FILTERS_TABLES_H
 #define _LIBBSC_FILTERS_TABLES_H
 
-#include "../../platform/platform.h"
+#include "../platform/platform.h"
 
 static const unsigned int bsc_code_table[4096] =
 {

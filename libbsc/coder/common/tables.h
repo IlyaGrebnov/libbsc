@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -32,12 +32,12 @@ See also the bsc and libbsc web site:
 
 --*/
 
-#ifndef _LIBBSC_QLFC_TABLES_H
-#define _LIBBSC_QLFC_TABLES_H
+#ifndef _LIBBSC_CODER_TABLES_H
+#define _LIBBSC_CODER_TABLES_H
 
 #include "../../platform/platform.h"
 
-static const char bsc_log2_table[256] =
+static const int bsc_log2_table[256] =
 {
    -1,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,
     5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,
@@ -1858,6 +1858,11 @@ static const unsigned char model_run_state_table[8192] =
       43, 219, 219, 127,  99,   0,   0,   0,  97, 151, 219, 195,   0,   0,   0,   0,  85, 156, 219, 182,   0,   0,   0,   0,  85, 156, 219, 146,   0,   0,   0,   0,
       85, 170, 219, 171,   0,   0,   0,   0,  94, 170, 219,   1,   0,   0,   0,   0,  94, 170, 219, 140,   0,   0,   0,   0,  94, 170, 219, 248,   0,   0,   0,   0,
 };
+
+static INLINE int bsc_log2_256(const int n)
+{
+    return bsc_log2_table[n];
+}
 
 static INLINE int bsc_log2(const int n)
 {

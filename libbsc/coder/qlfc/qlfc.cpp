@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -37,29 +37,21 @@ See also the bsc and libbsc web site:
 
 #include "qlfc.h"
 
-#include "../libbsc.h"
-#include "../platform/platform.h"
+#include "../../libbsc.h"
+#include "../../platform/platform.h"
 
-#include "core/coder.h"
-#include "core/model.h"
-#include "core/tables.h"
-#include "core/predictor.h"
+#include "../common/rangecoder.h"
+#include "../common/tables.h"
+#include "../common/predictor.h"
+
+#include "qlfc_model.h"
 
 int bsc_qlfc_init(int features)
 {
     return bsc_qlfc_init_static_model();
 }
 
-static INLINE int bsc_qlfc_num_blocks(int n)
-{
-    if (n <       256 * 1024)   return 1;
-    if (n <  4 * 1024 * 1024)   return 2;
-    if (n < 16 * 1024 * 1024)   return 4;
-
-    return 8;
-}
-
-unsigned char * bsc_qlfc_transform(const unsigned char * input, unsigned char * buffer, int n, unsigned char * MTFTable)
+unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
 {
     unsigned char Flag[ALPHABET_SIZE];
 
@@ -81,16 +73,16 @@ unsigned char * bsc_qlfc_transform(const unsigned char * input, unsigned char * 
         while (true)
         {
             unsigned char temporaryChar0 = MTFTable[rank + 0]; MTFTable[rank + 0] = previousChar;
-            if (temporaryChar0 == currentChar) {rank += 0; break; }
+            if (temporaryChar0 == currentChar) { rank += 0; break; }
 
             unsigned char temporaryChar1 = MTFTable[rank + 1]; MTFTable[rank + 1] = temporaryChar0;
-            if (temporaryChar1 == currentChar) {rank += 1; break; }
+            if (temporaryChar1 == currentChar) { rank += 1; break; }
 
             unsigned char temporaryChar2 = MTFTable[rank + 2]; MTFTable[rank + 2] = temporaryChar1;
-            if (temporaryChar2 == currentChar) {rank += 2; break; }
+            if (temporaryChar2 == currentChar) { rank += 2; break; }
 
             unsigned char temporaryChar3 = MTFTable[rank + 3]; MTFTable[rank + 3] = temporaryChar2;
-            if (temporaryChar3 == currentChar) {rank += 3; break; }
+            if (temporaryChar3 == currentChar) { rank += 3; break; }
 
             rank += 4; previousChar = temporaryChar3;
         }
@@ -118,7 +110,7 @@ unsigned char * bsc_qlfc_transform(const unsigned char * input, unsigned char * 
     return buffer + index;
 }
 
-int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, unsigned char * buffer, int n, BscQlfcModel * model)
+int bsc_qlfc_adaptive_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model)
 {
     unsigned char MTFTable[ALPHABET_SIZE];
 
@@ -136,12 +128,12 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
         rankHistory[i] = runHistory[i] = 0;
     }
 
-    unsigned char * rankArray = bsc_qlfc_transform(input, buffer, n, MTFTable);
+    unsigned char * rankArray = bsc_qlfc_transform(input, buffer, inputSize, MTFTable);
 
-    BinaryCoder coder;
+    RangeCoder coder;
 
-    coder.InitEncoder(output, n);
-    coder.EncodeWord((unsigned int)n);
+    coder.InitEncoder(output, outputSize);
+    coder.EncodeWord((unsigned int)inputSize);
 
     unsigned char usedChar[ALPHABET_SIZE];
     for (int i = 0; i < ALPHABET_SIZE; ++i) usedChar[i] = 0;
@@ -162,6 +154,7 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
                     if ((currentChar >> (bit + 1)) == (c >> (bit + 1)))
                     {
                         if (c & (1 << bit)) bit1 = true; else bit0 = true;
+                        if (bit0 && bit1) break;
                     }
                 }
             }
@@ -174,30 +167,52 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
 
         if (currentChar == prevChar)
         {
-            maxRank = bsc_log2(rank - 1);
+            maxRank = bsc_log2_256(rank - 1);
             break;
         }
 
         prevChar = currentChar; usedChar[currentChar] = 1;
     }
 
-    for (int i = 0; i < n;)
+    for (const unsigned char * inputEnd = input + inputSize; input < inputEnd;)
     {
         if (coder.CheckEOB())
         {
-            return LIBBSC_UNEXPECTED_EOB;
+            return LIBBSC_NOT_COMPRESSIBLE;
         }
 
-        int currentChar = input[i++];
-        int runSize = 1; for (; (i < n) && (input[i] == currentChar); ++i) runSize++;
+        int currentChar = *input, runSize;
+        {
+            const unsigned char * inputStart = input++;
+            while (true)
+            {
+                if (input <= inputEnd - 4)
+                {
+                    if (input[0] != currentChar) { input += 0; break; }
+                    if (input[1] != currentChar) { input += 1; break; }
+                    if (input[2] != currentChar) { input += 2; break; }
+                    if (input[3] != currentChar) { input += 3; break; }
+
+                    input += 4;
+                }
+                else
+                {
+                    while ((input < inputEnd) && (*input == currentChar)) ++input;
+                    break;
+                }
+            }
+
+            runSize = (int)(input - inputStart);
+        }
 
         int                 rank            =   *rankArray++;
         int                 history         =   rankHistory[currentChar];
         int                 state           =   model_rank_state(contextRank4, contextRun, history);
-        short *             statePredictor  = & model->Rank.StateModel[state];
-        short *             charPredictor   = & model->Rank.CharModel[currentChar];
-        short *             staticPredictor = & model->Rank.StaticModel;
-        ProbabilityMixer *  mixer           = & model->mixerOfRank[currentChar];
+
+        short *            RESTRICT statePredictor  = & model->Rank.StateModel[state];
+        short *            RESTRICT charPredictor   = & model->Rank.CharModel[currentChar];
+        short *            RESTRICT staticPredictor = & model->Rank.StaticModel;
+        ProbabilityMixer * RESTRICT mixer           = & model->mixerOfRank[currentChar];
 
         if (avgRank < 32)
         {
@@ -225,7 +240,7 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
                     coder.EncodeBit1(mixer->MixupAndUpdateBit1(probability0, probability1, probability2, M_RANK_TM_LR0, M_RANK_TM_LR1, M_RANK_TM_LR2, M_RANK_TM_TH1, M_RANK_TM_AR1));
                 }
 
-                int bitRankSize = bsc_log2(rank); rankHistory[currentChar] = bitRankSize;
+                int bitRankSize = bsc_log2_256(rank); rankHistory[currentChar] = bitRankSize;
 
                 statePredictor  = & model->Rank.Exponent.StateModel[state][0];
                 charPredictor   = & model->Rank.Exponent.CharModel[currentChar][0];
@@ -291,7 +306,7 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
         }
         else
         {
-            rankHistory[currentChar] = bsc_log2(rank);
+            rankHistory[currentChar] = bsc_log2_256(rank);
 
             statePredictor  = & model->Rank.Escape.StateModel[state][0];
             charPredictor   = & model->Rank.Escape.CharModel[currentChar][0];
@@ -432,7 +447,7 @@ int bsc_qlfc_encode_slow(const unsigned char * input, unsigned char * output, un
     return coder.FinishEncoder();
 }
 
-int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, unsigned char * buffer, int n, BscQlfcModel * model)
+int bsc_qlfc_static_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model)
 {
     unsigned char MTFTable[ALPHABET_SIZE];
 
@@ -450,12 +465,12 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
         rankHistory[i] = runHistory[i] = 0;
     }
 
-    unsigned char * rankArray = bsc_qlfc_transform(input, buffer, n, MTFTable);
+    unsigned char * rankArray = bsc_qlfc_transform(input, buffer, inputSize, MTFTable);
 
-    BinaryCoder coder;
+    RangeCoder coder;
 
-    coder.InitEncoder(output, n);
-    coder.EncodeWord((unsigned int)n);
+    coder.InitEncoder(output, outputSize);
+    coder.EncodeWord((unsigned int)inputSize);
 
     unsigned char usedChar[ALPHABET_SIZE];
     for (int i = 0; i < ALPHABET_SIZE; ++i) usedChar[i] = 0;
@@ -476,6 +491,7 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
                     if ((currentChar >> (bit + 1)) == (c >> (bit + 1)))
                     {
                         if (c & (1 << bit)) bit1 = true; else bit0 = true;
+                        if (bit0 && bit1) break;
                     }
                 }
             }
@@ -488,29 +504,51 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
 
         if (currentChar == prevChar)
         {
-            maxRank = bsc_log2(rank - 1);
+            maxRank = bsc_log2_256(rank - 1);
             break;
         }
 
         prevChar = currentChar; usedChar[currentChar] = 1;
     }
 
-    for (int i = 0; i < n;)
+    for (const unsigned char * inputEnd = input + inputSize; input < inputEnd;)
     {
         if (coder.CheckEOB())
         {
-            return LIBBSC_UNEXPECTED_EOB;
+            return LIBBSC_NOT_COMPRESSIBLE;
         }
 
-        int currentChar = input[i++];
-        int runSize = 1; for (; (i < n) && (input[i] == currentChar); ++i) runSize++;
+        int currentChar = *input, runSize;
+        {
+            const unsigned char * inputStart = input++;
+            while (true)
+            {
+                if (input <= inputEnd - 4)
+                {
+                    if (input[0] != currentChar) { input += 0; break; }
+                    if (input[1] != currentChar) { input += 1; break; }
+                    if (input[2] != currentChar) { input += 2; break; }
+                    if (input[3] != currentChar) { input += 3; break; }
+
+                    input += 4;
+                }
+                else
+                {
+                    while ((input < inputEnd) && (*input == currentChar)) ++input;
+                    break;
+                }
+            }
+
+            runSize = (int)(input - inputStart);
+        }
 
         int                 rank            =   *rankArray++;
         int                 history         =   rankHistory[currentChar];
         int                 state           =   model_rank_state(contextRank4, contextRun, history);
-        short *             statePredictor  = & model->Rank.StateModel[state];
-        short *             charPredictor   = & model->Rank.CharModel[currentChar];
-        short *             staticPredictor = & model->Rank.StaticModel;
+
+        short * RESTRICT    statePredictor  = & model->Rank.StateModel[state];
+        short * RESTRICT    charPredictor   = & model->Rank.CharModel[currentChar];
+        short * RESTRICT    staticPredictor = & model->Rank.StaticModel;
 
         if (avgRank < 32)
         {
@@ -538,7 +576,7 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
                     coder.EncodeBit1(probability);
                 }
 
-                int bitRankSize = bsc_log2(rank); rankHistory[currentChar] = bitRankSize;
+                int bitRankSize = bsc_log2_256(rank); rankHistory[currentChar] = bitRankSize;
 
                 statePredictor  = & model->Rank.Exponent.StateModel[state][0];
                 charPredictor   = & model->Rank.Exponent.CharModel[currentChar][0];
@@ -594,7 +632,7 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
         }
         else
         {
-            rankHistory[currentChar] = bsc_log2(rank);
+            rankHistory[currentChar] = bsc_log2_256(rank);
 
             statePredictor  = & model->Rank.Escape.StateModel[state][0];
             charPredictor   = & model->Rank.Escape.CharModel[currentChar][0];
@@ -715,9 +753,9 @@ int bsc_qlfc_encode_fast(const unsigned char * input, unsigned char * output, un
     return coder.FinishEncoder();
 }
 
-int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, BscQlfcModel * model)
+int bsc_qlfc_adaptive_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
 {
-    BinaryCoder coder;
+    RangeCoder coder;
 
     unsigned char MTFTable[ALPHABET_SIZE];
 
@@ -757,6 +795,7 @@ int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, Bs
                     if (currentChar == (c >> (bit + 1)))
                     {
                         if (c & (1 << bit)) bit1 = true; else bit0 = true;
+                        if (bit0 && bit1) break;
                     }
                 }
             }
@@ -776,7 +815,7 @@ int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, Bs
 
         if (currentChar == prevChar)
         {
-            maxRank = bsc_log2(rank - 1);
+            maxRank = bsc_log2_256(rank - 1);
             break;
         }
 
@@ -788,10 +827,11 @@ int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, Bs
         int                 currentChar     =   MTFTable[0];
         int                 history         =   rankHistory[currentChar];
         int                 state           =   model_rank_state(contextRank4, contextRun, history);
-        short *             statePredictor  = & model->Rank.StateModel[state];
-        short *             charPredictor   = & model->Rank.CharModel[currentChar];
-        short *             staticPredictor = & model->Rank.StaticModel;
-        ProbabilityMixer *  mixer           = & model->mixerOfRank[currentChar];
+
+        short *            RESTRICT statePredictor  = & model->Rank.StateModel[state];
+        short *            RESTRICT charPredictor   = & model->Rank.CharModel[currentChar];
+        short *            RESTRICT staticPredictor = & model->Rank.StaticModel;
+        ProbabilityMixer * RESTRICT mixer           = & model->mixerOfRank[currentChar];
 
         int rank = 1;
         if (avgRank < 32)
@@ -896,7 +936,7 @@ int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, Bs
                 }
             }
 
-            rankHistory[currentChar] = bsc_log2(rank);
+            rankHistory[currentChar] = bsc_log2_256(rank);
         }
 
         {
@@ -997,9 +1037,9 @@ int bsc_qlfc_decode_slow(const unsigned char * input, unsigned char * output, Bs
     return n;
 }
 
-int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, BscQlfcModel * model)
+int bsc_qlfc_static_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
 {
-    BinaryCoder coder;
+    RangeCoder coder;
 
     unsigned char MTFTable[ALPHABET_SIZE];
 
@@ -1039,6 +1079,7 @@ int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, Bs
                     if (currentChar == (c >> (bit + 1)))
                     {
                         if (c & (1 << bit)) bit1 = true; else bit0 = true;
+                        if (bit0 && bit1) break;
                     }
                 }
             }
@@ -1058,7 +1099,7 @@ int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, Bs
 
         if (currentChar == prevChar)
         {
-            maxRank = bsc_log2(rank - 1);
+            maxRank = bsc_log2_256(rank - 1);
             break;
         }
 
@@ -1070,9 +1111,10 @@ int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, Bs
         int                 currentChar     =   MTFTable[0];
         int                 history         =   rankHistory[currentChar];
         int                 state           =   model_rank_state(contextRank4, contextRun, history);
-        short *             statePredictor  = & model->Rank.StateModel[state];
-        short *             charPredictor   = & model->Rank.CharModel[currentChar];
-        short *             staticPredictor = & model->Rank.StaticModel;
+
+        short * RESTRICT    statePredictor  = & model->Rank.StateModel[state];
+        short * RESTRICT    charPredictor   = & model->Rank.CharModel[currentChar];
+        short * RESTRICT    staticPredictor = & model->Rank.StaticModel;
 
         int rank = 1;
         if (avgRank < 32)
@@ -1164,7 +1206,7 @@ int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, Bs
                 }
             }
 
-            rankHistory[currentChar] = bsc_log2(rank);
+            rankHistory[currentChar] = bsc_log2_256(rank);
         }
 
         {
@@ -1256,304 +1298,64 @@ int bsc_qlfc_decode_fast(const unsigned char * input, unsigned char * output, Bs
     return n;
 }
 
-int bsc_qlfc_encode_block(const unsigned char * input, unsigned char * output, int n, int features)
+int bsc_qlfc_static_encode_block(const unsigned char * input, unsigned char * output, int inputSize, int outputSize)
 {
-    if (BscQlfcModel * model = (BscQlfcModel *)bsc_malloc(sizeof(BscQlfcModel)))
+    if (QlfcStatisticalModel * model = (QlfcStatisticalModel *)bsc_malloc(sizeof(QlfcStatisticalModel)))
     {
-        if (unsigned char * buffer = (unsigned char *)bsc_malloc(n * sizeof(unsigned char)))
+        if (unsigned char * buffer = (unsigned char *)bsc_malloc(inputSize * sizeof(unsigned char)))
         {
-            if (features & LIBBSC_FEATURE_FASTMODE)
-            {
-                int result = bsc_qlfc_encode_fast(input, output + 1, buffer, n, model);
-                if (result >= LIBBSC_NO_ERROR) result = (output[0] = 1, result + 1);
-                bsc_free(buffer); bsc_free(model);
-                return result;
-            }
-            else
-            {
-                int result = bsc_qlfc_encode_slow(input, output + 1, buffer, n, model);
-                if (result >= LIBBSC_NO_ERROR) result = (output[0] = 0, result + 1);
-                bsc_free(buffer); bsc_free(model);
-                return result;
-            }
+            int result = bsc_qlfc_static_encode(input, output, buffer, inputSize, outputSize, model);
+
+            bsc_free(buffer); bsc_free(model);
+
+            return result;
         };
         bsc_free(model);
     };
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
-void bsc_qlfc_split_blocks(const unsigned char * input, int n, int nBlocks, int * blockStart, int * blockSize)
+int bsc_qlfc_adaptive_encode_block(const unsigned char * input, unsigned char * output, int inputSize, int outputSize)
 {
-    int rankSize = 0;
-    for (int i = 1; i < n; i += 32)
+    if (QlfcStatisticalModel * model = (QlfcStatisticalModel *)bsc_malloc(sizeof(QlfcStatisticalModel)))
     {
-        if (input[i] != input[i - 1]) rankSize++;
-    }
-
-    if (rankSize > nBlocks)
-    {
-        int blockRankSize = rankSize / nBlocks;
-
-        blockStart[0] = 0; rankSize = 0;
-        for (int id = 0, i = 1; i < n; i += 32)
+        if (unsigned char * buffer = (unsigned char *)bsc_malloc(inputSize * sizeof(unsigned char)))
         {
-            if (input[i] != input[i - 1])
-            {
-                rankSize++;
-                if (rankSize == blockRankSize)
-                {
-                    rankSize = 0;
+            int result = bsc_qlfc_adaptive_encode(input, output, buffer, inputSize, outputSize, model);
 
-                    blockSize[id] = i - blockStart[id];
-                    id++; blockStart[id] = i;
+            bsc_free(buffer); bsc_free(model);
 
-                    if (id == nBlocks - 1) break;
-                }
-            }
-        }
-        blockSize[nBlocks - 1] = n - blockStart[nBlocks - 1];
-    }
-    else
-    {
-        for (int p = 0; p < nBlocks; ++p)
-        {
-            blockStart[p] = (n / nBlocks) * p;
-            blockSize[p]  = (p != nBlocks - 1) ? n / nBlocks : n - (n / nBlocks) * (nBlocks - 1);
-        }
-    }
-}
-
-int bsc_qlfc_compress_serial(const unsigned char * input, unsigned char * output, int n, int features)
-{
-    if (bsc_qlfc_num_blocks(n) == 1)
-    {
-        int result = bsc_qlfc_encode_block(input, output + 1, n, features);
-        if (result >= LIBBSC_NO_ERROR) result = (output[0] = 1, result + 1);
-
-        return result;
-    }
-
-    int compressedStart[ALPHABET_SIZE];
-    int compressedSize[ALPHABET_SIZE];
-
-    int nBlocks   = bsc_qlfc_num_blocks(n);
-    int outputPtr = 1 + 8 * nBlocks;
-
-    bsc_qlfc_split_blocks(input, n, nBlocks, compressedStart, compressedSize);
-
-    output[0] = nBlocks;
-    for (int blockId = 0; blockId < nBlocks; ++blockId)
-    {
-        int inputStart  = compressedStart[blockId];
-        int inputSize   = compressedSize[blockId];
-        int outputSize  = inputSize; if (outputSize > n - outputPtr) outputSize = n - outputPtr;
-
-        int result = bsc_qlfc_encode_block(input + inputStart, output + outputPtr, inputSize, features);
-        if (result < LIBBSC_NO_ERROR)
-        {
-            if (outputPtr + inputSize >= n) return LIBBSC_NOT_COMPRESSIBLE;
-            result = inputSize; memcpy(output + outputPtr, input + inputStart, inputSize);
-        }
-
-        *(int *)(output + 1 + 8 * blockId + 0) = inputSize;
-        *(int *)(output + 1 + 8 * blockId + 4) = result;
-
-        outputPtr += result;
-    }
-
-    return outputPtr;
-}
-
-#ifdef LIBBSC_OPENMP
-
-int bsc_qlfc_compress_parallel(const unsigned char * input, unsigned char * output, int n, int features)
-{
-    if (unsigned char * buffer = (unsigned char *)bsc_malloc(n * sizeof(unsigned char)))
-    {
-        int compressionResult[ALPHABET_SIZE];
-        int compressedStart[ALPHABET_SIZE];
-        int compressedSize[ALPHABET_SIZE];
-
-        int nBlocks = bsc_qlfc_num_blocks(n);
-        int result  = LIBBSC_NO_ERROR;
-
-        output[0] = nBlocks;
-        #pragma omp parallel
-        {
-            if (omp_get_num_threads() == 1)
-            {
-                result = bsc_qlfc_compress_serial(input, output, n, features);
-            }
-            else
-            {
-                #pragma omp single
-                {
-                    bsc_qlfc_split_blocks(input, n, nBlocks, compressedStart, compressedSize);
-                }
-
-                #pragma omp for schedule(dynamic)
-                for (int blockId = 0; blockId < nBlocks; ++blockId)
-                {
-                    int blockStart   = compressedStart[blockId];
-                    int blockSize    = compressedSize[blockId];
-
-                    compressionResult[blockId] = bsc_qlfc_encode_block(input + blockStart, buffer + blockStart, blockSize, features);
-                    if (compressionResult[blockId] < LIBBSC_NO_ERROR) compressionResult[blockId] = blockSize;
-
-                    *(int *)(output + 1 + 8 * blockId + 0) = blockSize;
-                    *(int *)(output + 1 + 8 * blockId + 4) = compressionResult[blockId];
-                }
-
-                #pragma omp single
-                {
-                    result = 1 + 8 * nBlocks;
-                    for (int blockId = 0; blockId < nBlocks; ++blockId)
-                    {
-                        result += compressionResult[blockId];
-                    }
-
-                    if (result >= n) result = LIBBSC_NOT_COMPRESSIBLE;
-                }
-
-                if (result >= LIBBSC_NO_ERROR)
-                {
-                    #pragma omp for schedule(dynamic)
-                    for (int blockId = 0; blockId < nBlocks; ++blockId)
-                    {
-                        int blockStart   = compressedStart[blockId];
-                        int blockSize    = compressedSize[blockId];
-
-                        int outputPtr = 1 + 8 * nBlocks;
-                        for (int p = 0; p < blockId; ++p) outputPtr += compressionResult[p];
-
-                        if (compressionResult[blockId] != blockSize)
-                        {
-                            memcpy(output + outputPtr, buffer + blockStart, compressionResult[blockId]);
-                        }
-                        else
-                        {
-                            memcpy(output + outputPtr, input + blockStart, compressionResult[blockId]);
-                        }
-                    }
-                }
-            }
-        }
-
-        bsc_free(buffer);
-
-        return result;
-    }
-    return LIBBSC_NOT_ENOUGH_MEMORY;
-}
-
-#endif
-
-int bsc_qlfc_compress(const unsigned char * input, unsigned char * output, int n, int features)
-{
-
-#ifdef LIBBSC_OPENMP
-
-    if ((bsc_qlfc_num_blocks(n) != 1) && (features & LIBBSC_FEATURE_MULTITHREADING))
-    {
-        return bsc_qlfc_compress_parallel(input, output, n, features);
-    }
-
-#endif
-
-    return bsc_qlfc_compress_serial(input, output, n, features);
-}
-
-
-int bsc_qlfc_decode_block(const unsigned char * input, unsigned char * output, int features)
-{
-    if (BscQlfcModel * model = (BscQlfcModel *)bsc_malloc(sizeof(BscQlfcModel)))
-    {
-        if (input[0] > 0)
-        {
-            int size = bsc_qlfc_decode_fast(input + 1, output, model);
-            bsc_free(model);
-            return size;
-        }
-        else
-        {
-            int size = bsc_qlfc_decode_slow(input + 1, output, model);
-            bsc_free(model);
-            return size;
-        }
+            return result;
+        };
+        bsc_free(model);
     };
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
-int bsc_qlfc_decompress(const unsigned char * input, unsigned char * output, int features)
+int bsc_qlfc_static_decode_block(const unsigned char * input, unsigned char * output)
 {
-    int nBlocks = input[0];
-
-    if (nBlocks == 1)
+    if (QlfcStatisticalModel * model = (QlfcStatisticalModel *)bsc_malloc(sizeof(QlfcStatisticalModel)))
     {
-        return bsc_qlfc_decode_block(input + 1, output, features);
-    }
+        int result = bsc_qlfc_static_decode(input, output, model);
 
-    int decompressionResult[ALPHABET_SIZE];
+        bsc_free(model);
 
-#ifdef LIBBSC_OPENMP
+        return result;
+    };
+    return LIBBSC_NOT_ENOUGH_MEMORY;
+}
 
-    if (features & LIBBSC_FEATURE_MULTITHREADING)
+int bsc_qlfc_adaptive_decode_block(const unsigned char * input, unsigned char * output)
+{
+    if (QlfcStatisticalModel * model = (QlfcStatisticalModel *)bsc_malloc(sizeof(QlfcStatisticalModel)))
     {
-        #pragma omp parallel for schedule(dynamic)
-        for (int blockId = 0; blockId < nBlocks; ++blockId)
-        {
-            int inputPtr = 0;  for (int p = 0; p < blockId; ++p) inputPtr  += *(int *)(input + 1 + 8 * p + 4);
-            int outputPtr = 0; for (int p = 0; p < blockId; ++p) outputPtr += *(int *)(input + 1 + 8 * p + 0);
+        int result = bsc_qlfc_adaptive_decode(input, output, model);
 
-            inputPtr += 1 + 8 * nBlocks;
+        bsc_free(model);
 
-            int inputSize  = *(int *)(input + 1 + 8 * blockId + 4);
-            int outputSize = *(int *)(input + 1 + 8 * blockId + 0);
-
-            if (inputSize != outputSize)
-            {
-                decompressionResult[blockId] = bsc_qlfc_decode_block(input + inputPtr, output + outputPtr, features);
-            }
-            else
-            {
-                decompressionResult[blockId] = inputSize; memcpy(output + outputPtr, input + inputPtr, inputSize);
-            }
-        }
-    }
-    else
-
-#endif
-
-    {
-        for (int blockId = 0; blockId < nBlocks; ++blockId)
-        {
-            int inputPtr = 0;  for (int p = 0; p < blockId; ++p) inputPtr  += *(int *)(input + 1 + 8 * p + 4);
-            int outputPtr = 0; for (int p = 0; p < blockId; ++p) outputPtr += *(int *)(input + 1 + 8 * p + 0);
-
-            inputPtr += 1 + 8 * nBlocks;
-
-            int inputSize  = *(int *)(input + 1 + 8 * blockId + 4);
-            int outputSize = *(int *)(input + 1 + 8 * blockId + 0);
-
-            if (inputSize != outputSize)
-            {
-                decompressionResult[blockId] = bsc_qlfc_decode_block(input + inputPtr, output + outputPtr, features);
-            }
-            else
-            {
-                decompressionResult[blockId] = inputSize; memcpy(output + outputPtr, input + inputPtr, inputSize);
-            }
-        }
-    }
-
-    int dataSize = 0, result = LIBBSC_NO_ERROR;
-    for (int blockId = 0; blockId < nBlocks; ++blockId)
-    {
-        if (decompressionResult[blockId] < LIBBSC_NO_ERROR) result = decompressionResult[blockId];
-        dataSize += decompressionResult[blockId];
-    }
-
-    return (result == LIBBSC_NO_ERROR) ? dataSize : result;
+        return result;
+    };
+    return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
 /*-----------------------------------------------------------*/

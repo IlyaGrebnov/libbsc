@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -88,7 +88,7 @@ extern "C" {
     * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
-    int bsc_reorder_forward(unsigned char * T, int n, char recordSize, int features);
+    int bsc_reorder_forward(unsigned char * T, int n, int recordSize, int features);
 
     /**
     * Reorders memory block for specific size of record (Reverse transform).
@@ -98,7 +98,7 @@ extern "C" {
     * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
-    int bsc_reorder_reverse(unsigned char * T, int n, char recordSize, int features);
+    int bsc_reorder_reverse(unsigned char * T, int n, int recordSize, int features);
 
 #ifdef __cplusplus
 }

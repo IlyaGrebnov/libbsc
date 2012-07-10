@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------*/
 /* Block Sorting, Lossless Data Compression Library.         */
-/* Model of sort transformed data                            */
+/* Statistical data compression model for QLFC               */
 /*-----------------------------------------------------------*/
 
 /*--
@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -35,9 +35,7 @@ See also the bsc and libbsc web site:
 #ifndef _LIBBSC_QLFC_MODEL_H
 #define _LIBBSC_QLFC_MODEL_H
 
-#include "../../platform/platform.h"
-
-#include "predictor.h"
+#include "../common/predictor.h"
 
 const int M_RANK_TS_TH0 =    1; const int M_RANK_TS_AR0 =   57;
 const int M_RANK_TS_TH1 = -111; const int M_RANK_TS_AR1 =   31;
@@ -179,7 +177,7 @@ const int F_RUN_MP_TH1 = -214; const int F_RUN_MP_AR1 =   19;
 const int F_RUN_MM_LR0 =    7; const int F_RUN_MM_LR1 =   15;
 const int F_RUN_MM_LR2 =   10;
 
-struct BscQlfcModel
+struct QlfcStatisticalModel
 {
 
 public:
@@ -244,99 +242,11 @@ public:
     } Run;
 };
 
-BscQlfcModel static_model;
-
-static int bsc_qlfc_init_static_model()
-{
-    for (int mixer = 0; mixer < ALPHABET_SIZE; ++mixer)
-    {
-        static_model.mixerOfRank[mixer].Init();
-        static_model.mixerOfRankEscape[mixer].Init();
-        static_model.mixerOfRun[mixer].Init();
-    }
-    for (int bit = 0; bit < 8; ++bit)
-    {
-        static_model.mixerOfRankMantissa[bit].Init();
-        for (int context = 0; context < 8; ++context)
-            static_model.mixerOfRankExponent[context][bit].Init();
-    }
-    for (int bit = 0; bit < 32; ++bit)
-    {
-        static_model.mixerOfRunMantissa[bit].Init();
-        for (int context = 0; context < 32; ++context)
-            static_model.mixerOfRunExponent[context][bit].Init();
-    }
-    {
-        static_model.Rank.StaticModel = 2048;
-        for (int state = 0; state < ALPHABET_SIZE; ++state)
-            static_model.Rank.StateModel[state] = 2048;
-        for (int context = 0; context < ALPHABET_SIZE; ++context)
-            static_model.Rank.CharModel[context] = 2048;
-    }
-    for (int bit = 0; bit < 8; ++bit)
-    {
-        static_model.Rank.Exponent.StaticModel[bit] = 2048;
-        for (int state = 0; state < ALPHABET_SIZE; ++state)
-            static_model.Rank.Exponent.StateModel[state][bit] = 2048;
-        for (int context = 0; context < ALPHABET_SIZE; ++context)
-            static_model.Rank.Exponent.CharModel[context][bit] = 2048;
-    }
-    for (int bitRankSize = 0; bitRankSize < 8; ++bitRankSize)
-    {
-        for (int bit = 0; bit < ALPHABET_SIZE; ++bit)
-        {
-            static_model.Rank.Mantissa[bitRankSize].StaticModel[bit] = 2048;
-            for (int state = 0; state < ALPHABET_SIZE; ++state)
-                static_model.Rank.Mantissa[bitRankSize].StateModel[state][bit] = 2048;
-            for (int context = 0; context < ALPHABET_SIZE; ++context)
-                static_model.Rank.Mantissa[bitRankSize].CharModel[context][bit] = 2048;
-        }
-    }
-    for (int bit = 0; bit < ALPHABET_SIZE; ++bit)
-    {
-        static_model.Rank.Escape.StaticModel[bit] = 2048;
-        for (int state = 0; state < ALPHABET_SIZE; ++state)
-            static_model.Rank.Escape.StateModel[state][bit] = 2048;
-        for (int context = 0; context < ALPHABET_SIZE; ++context)
-            static_model.Rank.Escape.CharModel[context][bit] = 2048;
-    }
-    {
-        static_model.Run.StaticModel = 2048;
-        for (int state = 0; state < ALPHABET_SIZE; ++state)
-            static_model.Run.StateModel[state] = 2048;
-        for (int context = 0; context < ALPHABET_SIZE; ++context)
-            static_model.Run.CharModel[context] = 2048;
-    }
-    for (int bit = 0; bit < 32; ++bit)
-    {
-        static_model.Run.Exponent.StaticModel[bit] = 2048;
-        for (int state = 0; state < ALPHABET_SIZE; ++state)
-            static_model.Run.Exponent.StateModel[state][bit] = 2048;
-        for (int context = 0; context < ALPHABET_SIZE; ++context)
-            static_model.Run.Exponent.CharModel[context][bit] = 2048;
-    }
-    for (int bitRunSize = 0; bitRunSize < 32; ++bitRunSize)
-    {
-        for (int bit = 0; bit < 32; ++bit)
-        {
-            static_model.Run.Mantissa[bitRunSize].StaticModel[bit] = 2048;
-            for (int state = 0; state < ALPHABET_SIZE; ++state)
-                static_model.Run.Mantissa[bitRunSize].StateModel[state][bit] = 2048;
-            for (int context = 0; context < ALPHABET_SIZE; ++context)
-                static_model.Run.Mantissa[bitRunSize].CharModel[context][bit] = 2048;
-        }
-    }
-
-    return LIBBSC_NO_ERROR;
-}
-
-INLINE void bsc_qlfc_init_model(BscQlfcModel * model)
-{
-    memcpy(model, &static_model, sizeof(BscQlfcModel));
-}
+int  bsc_qlfc_init_static_model();
+void bsc_qlfc_init_model(QlfcStatisticalModel * model);
 
 #endif
 
 /*-----------------------------------------------------------*/
-/* End                                               model.h */
+/* End                                          qlfc_model.h */
 /*-----------------------------------------------------------*/

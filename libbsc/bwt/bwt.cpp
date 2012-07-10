@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -53,7 +53,7 @@ int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * 
     return index;
 }
 
-static int bsc_unbwt_mergedTL_serial(unsigned char * T, unsigned int * P, int n, int index)
+static int bsc_unbwt_mergedTL_serial(unsigned char * RESTRICT T, unsigned int * RESTRICT P, int n, int index)
 {
     unsigned int bucket[ALPHABET_SIZE];
 
@@ -87,11 +87,11 @@ static int bsc_unbwt_mergedTL_serial(unsigned char * T, unsigned int * P, int n,
 
 #define BWT_NUM_FASTBITS (17)
 
-static int bsc_unbwt_biPSI_serial(unsigned char * T, unsigned int * P, int n, int index)
+static int bsc_unbwt_biPSI_serial(unsigned char * RESTRICT T, unsigned int * RESTRICT P, int n, int index)
 {
-    if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+    if (int * RESTRICT bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
-        if (unsigned short * fastbits = (unsigned short *)bsc_malloc((1 + (1 << BWT_NUM_FASTBITS)) * sizeof(unsigned short)))
+        if (unsigned short * RESTRICT fastbits = (unsigned short *)bsc_malloc((1 + (1 << BWT_NUM_FASTBITS)) * sizeof(unsigned short)))
         {
             int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(int));
 
@@ -104,7 +104,7 @@ static int bsc_unbwt_biPSI_serial(unsigned char * T, unsigned int * P, int n, in
                 int tmp = sum; sum += count[c]; count[c] = tmp;
                 if (count[c] != sum)
                 {
-                    int * bucket_p = &bucket[c << 8];
+                    int * RESTRICT bucket_p = &bucket[c << 8];
 
                     int hi = index; if (sum < hi) hi = sum;
                     for (int i = count[c]; i < hi; ++i) bucket_p[T[i]]++;
@@ -119,7 +119,7 @@ static int bsc_unbwt_biPSI_serial(unsigned char * T, unsigned int * P, int n, in
             {
                 if (c == lastc) sum++;
 
-                int * bucket_p = &bucket[c];
+                int * RESTRICT bucket_p = &bucket[c];
                 for (int d = 0; d < ALPHABET_SIZE; ++d)
                 {
                     int tmp = sum; sum += bucket_p[d << 8]; bucket_p[d << 8] = tmp;
@@ -181,7 +181,7 @@ static int bsc_unbwt_reconstruct_serial(unsigned char * T, unsigned int * P, int
 
 #ifdef LIBBSC_OPENMP
 
-static int bsc_unbwt_mergedTL_parallel(unsigned char * T, unsigned int * P, int n, int index, int * indexes)
+static int bsc_unbwt_mergedTL_parallel(unsigned char * RESTRICT T, unsigned int * RESTRICT P, int n, int index, int * RESTRICT indexes)
 {
     unsigned int bucket[ALPHABET_SIZE];
 
@@ -230,11 +230,11 @@ static int bsc_unbwt_mergedTL_parallel(unsigned char * T, unsigned int * P, int 
     return LIBBSC_NO_ERROR;
 }
 
-static int bsc_unbwt_biPSI_parallel(unsigned char * T, unsigned int * P, int n, int index, int * indexes)
+static int bsc_unbwt_biPSI_parallel(unsigned char * RESTRICT T, unsigned int * RESTRICT P, int n, int index, int * RESTRICT indexes)
 {
-    if (int * bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+    if (int * RESTRICT bucket = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
-        if (unsigned short * fastbits = (unsigned short *)bsc_malloc((1 + (1 << BWT_NUM_FASTBITS)) * sizeof(unsigned short)))
+        if (unsigned short * RESTRICT fastbits = (unsigned short *)bsc_malloc((1 + (1 << BWT_NUM_FASTBITS)) * sizeof(unsigned short)))
         {
             int count[ALPHABET_SIZE]; memset(count, 0, ALPHABET_SIZE * sizeof(int));
 
@@ -264,7 +264,7 @@ static int bsc_unbwt_biPSI_parallel(unsigned char * T, unsigned int * P, int n, 
                 int start = count[c], end = (c + 1 < ALPHABET_SIZE) ? count[c + 1] : n + 1;
                 if (start != end)
                 {
-                    int * bucket_p = &bucket[c << 8];
+                    int * RESTRICT bucket_p = &bucket[c << 8];
 
                     int hi = index; if (end < hi) hi = end;
                     for (int i = start; i < hi; ++i) bucket_p[T[i]]++;
@@ -279,7 +279,7 @@ static int bsc_unbwt_biPSI_parallel(unsigned char * T, unsigned int * P, int n, 
             {
                 if (c == lastc) sum++;
 
-                int * bucket_p = &bucket[c];
+                int * RESTRICT bucket_p = &bucket[c];
                 for (int d = 0; d < ALPHABET_SIZE; ++d)
                 {
                     int tmp = sum; sum += bucket_p[d << 8]; bucket_p[d << 8] = tmp;

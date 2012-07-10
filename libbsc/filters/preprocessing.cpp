@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -67,7 +67,7 @@ int bsc_reverse_block(unsigned char * T, int n, int features)
     return LIBBSC_NO_ERROR;
 }
 
-int bsc_reorder_forward(unsigned char * T, int n, char recordSize, int features)
+int bsc_reorder_forward(unsigned char * T, int n, int recordSize, int features)
 {
     if (recordSize <= 0) return LIBBSC_BAD_PARAMETER;
     if (recordSize == 1) return LIBBSC_NO_ERROR;
@@ -76,8 +76,8 @@ int bsc_reorder_forward(unsigned char * T, int n, char recordSize, int features)
     {
         memcpy(buffer, T, n);
 
-        unsigned char * S = buffer;
-        unsigned char * D = T;
+        unsigned char * RESTRICT S = buffer;
+        unsigned char * RESTRICT D = T;
 
         int chunk = (n / recordSize);
 
@@ -122,7 +122,7 @@ int bsc_reorder_forward(unsigned char * T, int n, char recordSize, int features)
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
-int bsc_reorder_reverse(unsigned char * T, int n, char recordSize, int features)
+int bsc_reorder_reverse(unsigned char * T, int n, int recordSize, int features)
 {
     if (recordSize <= 0) return LIBBSC_BAD_PARAMETER;
     if (recordSize == 1) return LIBBSC_NO_ERROR;
@@ -131,8 +131,8 @@ int bsc_reorder_reverse(unsigned char * T, int n, char recordSize, int features)
     {
         memcpy(buffer, T, n);
 
-        unsigned char * S = buffer;
-        unsigned char * D = T;
+        unsigned char * RESTRICT S = buffer;
+        unsigned char * RESTRICT D = T;
 
         int chunk = (n / recordSize);
 

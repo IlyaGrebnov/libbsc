@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -42,9 +42,8 @@ See also the bsc and libbsc web site:
 
 #if defined(_WIN32)
   #include <windows.h>
+  SIZE_T g_LargePageSize = 0;
 #endif
-
-long long g_LargePageSize = 0;
 
 int bsc_platform_init(int features)
 {
@@ -72,16 +71,19 @@ int bsc_platform_init(int features)
         }
 
         {
-            typedef SIZE_T (WINAPI * GetLargePageMinimumProcT)();
-
-            GetLargePageMinimumProcT largePageMinimumProc = (GetLargePageMinimumProcT)GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetLargePageMinimum");
-            if (largePageMinimumProc != NULL)
+            if (HMODULE hKernel = GetModuleHandle(TEXT("kernel32.dll")))
             {
-                SIZE_T largePageSize = largePageMinimumProc();
+                typedef SIZE_T (WINAPI * GetLargePageMinimumProcT)();
 
-                if ((largePageSize & (largePageSize - 1)) != 0) largePageSize = 0;
+                GetLargePageMinimumProcT largePageMinimumProc = (GetLargePageMinimumProcT)GetProcAddress(hKernel, "GetLargePageMinimum");
+                if (largePageMinimumProc != NULL)
+                {
+                    SIZE_T largePageSize = largePageMinimumProc();
 
-                g_LargePageSize = largePageSize;
+                    if ((largePageSize & (largePageSize - 1)) != 0) largePageSize = 0;
+
+                    g_LargePageSize = largePageSize;
+                }
             }
         }
     }
@@ -129,5 +131,5 @@ void bsc_free(void * address)
 }
 
 /*-----------------------------------------------------------*/
-/* End                                            common.cpp */
+/* End                                          platform.cpp */
 /*-----------------------------------------------------------*/

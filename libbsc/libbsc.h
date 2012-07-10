@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -62,18 +62,23 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #define LIBBSC_GPU_NOT_SUPPORTED      -8
 #define LIBBSC_GPU_NOT_ENOUGH_MEMORY  -9
 
+#define LIBBSC_BLOCKSORTER_NONE        0
 #define LIBBSC_BLOCKSORTER_BWT         1
 
 #ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 
-  #define LIBBSC_BLOCKSORTER_ST3       2
-  #define LIBBSC_BLOCKSORTER_ST4       3
-  #define LIBBSC_BLOCKSORTER_ST5       4
-  #define LIBBSC_BLOCKSORTER_ST6       5
-  #define LIBBSC_BLOCKSORTER_ST7       6
-  #define LIBBSC_BLOCKSORTER_ST8       7
+  #define LIBBSC_BLOCKSORTER_ST3       3
+  #define LIBBSC_BLOCKSORTER_ST4       4
+  #define LIBBSC_BLOCKSORTER_ST5       5
+  #define LIBBSC_BLOCKSORTER_ST6       6
+  #define LIBBSC_BLOCKSORTER_ST7       7
+  #define LIBBSC_BLOCKSORTER_ST8       8
 
 #endif
+
+#define LIBBSC_CODER_NONE              0
+#define LIBBSC_CODER_QLFC_STATIC       1
+#define LIBBSC_CODER_QLFC_ADAPTIVE     2
 
 #define LIBBSC_FEATURE_NONE            0
 #define LIBBSC_FEATURE_FASTMODE        1
@@ -84,9 +89,10 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #define LIBBSC_DEFAULT_LZPHASHSIZE     16
 #define LIBBSC_DEFAULT_LZPMINLEN       128
 #define LIBBSC_DEFAULT_BLOCKSORTER     LIBBSC_BLOCKSORTER_BWT
-#define LIBBSC_DEFAULT_FEATURES        LIBBSC_FEATURE_MULTITHREADING
+#define LIBBSC_DEFAULT_CODER           LIBBSC_CODER_QLFC_STATIC
+#define LIBBSC_DEFAULT_FEATURES        LIBBSC_FEATURE_FASTMODE | LIBBSC_FEATURE_MULTITHREADING
 
-#define LIBBSC_HEADER_SIZE             24
+#define LIBBSC_HEADER_SIZE             28
 
 #ifdef __cplusplus
 extern "C" {
@@ -94,7 +100,7 @@ extern "C" {
 
     /**
     * You should call this function before you call any of the other functions in libbsc.
-    * @param features   - the set of additional features.
+    * @param features - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
     int bsc_init(int features);
@@ -106,11 +112,12 @@ extern "C" {
     * @param n                                  - the length of the input memory block.
     * @param lzpHashSize[0, 10..28]             - the hash table size if LZP enabled, 0 otherwise.
     * @param lzpMinLen[0, 4..255]               - the minimum match length if LZP enabled, 0 otherwise.
-    * @param blockSorter[ST3..ST8, BWT]         - block sorting algorithm.
+    * @param blockSorter[ST3..ST8, BWT]         - the block sorting algorithm.
+    * @param coder[MTF or QLFC]                 - the entropy coding algorithm.
     * @param features                           - the set of additional features.
     * @return the length of compressed memory block if no error occurred, error code otherwise.
     */
-    int bsc_compress(const unsigned char * input, unsigned char * output, int n, int lzpHashSize, int lzpMinLen, int blockSorter, int features);
+    int bsc_compress(const unsigned char * input, unsigned char * output, int n, int lzpHashSize, int lzpMinLen, int blockSorter, int coder, int features);
 
     /**
     * Store a memory block.

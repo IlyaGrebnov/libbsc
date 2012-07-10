@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------*/
 /* Block Sorting, Lossless Data Compression Library.         */
-/* Binary arithmetic coder                                   */
+/* Range coder                                               */
 /*-----------------------------------------------------------*/
 
 /*--
@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -32,100 +32,101 @@ See also the bsc and libbsc web site:
 
 --*/
 
-#ifndef _LIBBSC_QLFC_CODER_H
-#define _LIBBSC_QLFC_CODER_H
+#ifndef _LIBBSC_CODER_RANGECODER_H
+#define _LIBBSC_CODER_RANGECODER_H
 
 #include "../../platform/platform.h"
 
-class BinaryCoder
+class RangeCoder
 {
 
 private:
 
-    long long    ari_low;
+    union ari
+    {
+        struct u
+        {
+            unsigned int low32;
+            unsigned int carry;
+        } u;
+        unsigned long long low;
+    } ari;
+
     unsigned int ari_code;
     unsigned int ari_ffnum;
     unsigned int ari_cache;
     unsigned int ari_range;
 
-    const unsigned char * input;
+    const unsigned short * RESTRICT ari_input;
+          unsigned short * RESTRICT ari_output;
+          unsigned short * RESTRICT ari_outputEOB;
+          unsigned short * RESTRICT ari_outputStart;
 
-    unsigned char * output;
-    unsigned char * outputEOB;
-    unsigned char * outputStart;
+    INLINE void OutputShort(unsigned short s)
+    {
+        *ari_output++ = s;
+    };
+
+    INLINE unsigned short InputShort()
+    {
+        return *ari_input++;
+    };
 
     INLINE void ShiftLow()
     {
-        if ((ari_low ^ 0xff000000) > 0xffffff)
+        if (ari.u.low32 < 0xffff0000U || ari.u.carry)
         {
-            OutputByte((unsigned char)(ari_cache + (ari_low >> 32)));
-            int c = (int)(0xff + (ari_low >> 32));
-            while (ari_ffnum) OutputByte(c), ari_ffnum--;
-            ari_cache = (unsigned int)(ari_low) >> 24;
+            OutputShort(ari_cache + ari.u.carry);
+            if (ari_ffnum)
+            {
+                unsigned short s = ari.u.carry - 1;
+                do { OutputShort(s); } while (--ari_ffnum);
+            }
+            ari_cache = ari.u.low32 >> 16; ari.u.carry = 0;
         } else ari_ffnum++;
-        ari_low = (unsigned int)ari_low << 8;
+        ari.u.low32 <<= 16;
     }
-
-    INLINE void OutputByte(unsigned char b)
-    {
-        *output++ = b;
-    };
-
-    INLINE unsigned char InputByte()
-    {
-        return *input++;
-    };
 
 public:
 
     INLINE bool CheckEOB()
     {
-        return output >= outputEOB;
+        return ari_output >= ari_outputEOB;
     }
 
-    INLINE void InitEncoder(unsigned char * output, int n)
+    INLINE void InitEncoder(unsigned char * output, int outputSize)
     {
-        this->outputStart = output;
-        this->output      = output;
-        this->outputEOB   = output + n - 16;
-
-        ari_low   = 0;
-        ari_ffnum = 0;
-        ari_cache = 0;
-        ari_range = 0xffffffff;
+        ari_outputStart = (unsigned short *)output;
+        ari_output      = (unsigned short *)output;
+        ari_outputEOB   = (unsigned short *)(output + outputSize - 16);
+        ari.low         = 0;
+        ari_ffnum       = 0;
+        ari_cache       = 0;
+        ari_range       = 0xffffffff;
     };
 
     INLINE int FinishEncoder()
     {
-        ari_low += (ari_range >> 1);
-
-        ShiftLow();
-        ShiftLow();
-        ShiftLow();
-        ShiftLow();
-        ShiftLow();
-
-        return (int)(output - outputStart);
+        ShiftLow(); ShiftLow(); ShiftLow();
+        return (int)(ari_output - ari_outputStart) * sizeof(ari_output[0]);
     }
 
     INLINE void EncodeBit0(int probability)
     {
         ari_range = (ari_range >> 12) * probability;
-        while (ari_range < 0x1000000)
+        if (ari_range < 0x10000)
         {
-            ShiftLow();
-            ari_range <<= 8;
+            ari_range <<= 16; ShiftLow();
         }
     }
 
     INLINE void EncodeBit1(int probability)
     {
         unsigned int range = (ari_range >> 12) * probability;
-        ari_low += range; ari_range -= range;
-        while (ari_range < 0x1000000)
+        ari.low += range; ari_range -= range;
+        if (ari_range < 0x10000)
         {
-            ShiftLow();
-            ari_range <<= 8;
+            ari_range <<= 16; ShiftLow();
         }
     }
 
@@ -152,18 +153,12 @@ public:
 
     INLINE void InitDecoder(const unsigned char * input)
     {
-        this->input = input;
-
+        ari_input = (unsigned short *)input;
         ari_code  = 0;
-        ari_ffnum = 0;
-        ari_cache = 0;
         ari_range = 0xffffffff;
-
-        ari_code = (ari_code << 8) | InputByte();
-        ari_code = (ari_code << 8) | InputByte();
-        ari_code = (ari_code << 8) | InputByte();
-        ari_code = (ari_code << 8) | InputByte();
-        ari_code = (ari_code << 8) | InputByte();
+        ari_code  = (ari_code << 16) | InputShort();
+        ari_code  = (ari_code << 16) | InputShort();
+        ari_code  = (ari_code << 16) | InputShort();
     };
 
     INLINE int DecodeBit(int probability)
@@ -172,18 +167,16 @@ public:
         if (ari_code >= range)
         {
             ari_code -= range; ari_range -= range;
-            while (ari_range < 0x1000000)
+            if (ari_range < 0x10000)
             {
-                ari_code = (ari_code << 8) | InputByte();
-                ari_range <<= 8;
+                ari_range <<= 16; ari_code = (ari_code << 16) | InputShort();
             }
             return 1;
         }
         ari_range = range;
-        while (ari_range < 0x1000000)
+        if (ari_range < 0x10000)
         {
-            ari_code = (ari_code << 8) | InputByte();
-            ari_range <<= 8;
+            ari_range <<= 16; ari_code = (ari_code << 16) | InputShort();
         }
         return 0;
     }
@@ -218,5 +211,5 @@ public:
 #endif
 
 /*-----------------------------------------------------------*/
-/* End                                               coder.h */
+/* End                                          rangecoder.h */
 /*-----------------------------------------------------------*/

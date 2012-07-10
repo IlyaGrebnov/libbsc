@@ -4,7 +4,7 @@ CC = g++
 AR = ar
 RANLIB = ranlib
 
-CFLAGS = -g -Wall -Ilibbsc
+CFLAGS = -g -Wall
 
 # Sort Transform is patented by Michael Schindler under US patent 6,199,064.
 # However for research purposes this algorithm is included in this software.
@@ -36,16 +36,19 @@ CFLAGS += -DNDEBUG
 # Where you want bsc installed when you do 'make install'
 PREFIX = /usr
 
-OBJS = preprocessing.o \
-       divsufsort.o    \
-       detectors.o     \
-       platform.o      \
-       libbsc.o        \
+OBJS = \
        adler32.o       \
-       qlfc.o          \
+       divsufsort.o    \
        bwt.o           \
+       coder.o         \
+       qlfc.o          \
+       qlfc_model.o    \
+       detectors.o     \
+       preprocessing.o \
+       libbsc.o        \
        lzp.o           \
-       st.o
+       platform.o      \
+       st.o            \
 
 all: libbsc.a bsc
 
@@ -75,32 +78,38 @@ install: libbsc.a bsc
 clean:
 	rm -f *.o libbsc.a bsc
 
-preprocessing.o: libbsc/filters/preprocessing.cpp
-	$(CC) $(CFLAGS) -c libbsc/filters/preprocessing.cpp
+adler32.o: libbsc/adler32/adler32.cpp
+	$(CC) $(CFLAGS) -c libbsc/adler32/adler32.cpp
 
 divsufsort.o: libbsc/bwt/divsufsort/divsufsort.c
 	$(CC) $(CFLAGS) -c libbsc/bwt/divsufsort/divsufsort.c
 
+bwt.o: libbsc/bwt/bwt.cpp
+	$(CC) $(CFLAGS) -c libbsc/bwt/bwt.cpp
+
+coder.o: libbsc/coder/coder.cpp
+	$(CC) $(CFLAGS) -c libbsc/coder/coder.cpp
+
+qlfc.o: libbsc/coder/qlfc/qlfc.cpp
+	$(CC) $(CFLAGS) -c libbsc/coder/qlfc/qlfc.cpp
+
+qlfc_model.o: libbsc/coder/qlfc/qlfc_model.cpp
+	$(CC) $(CFLAGS) -c libbsc/coder/qlfc/qlfc_model.cpp
+
 detectors.o: libbsc/filters/detectors.cpp
 	$(CC) $(CFLAGS) -c libbsc/filters/detectors.cpp
 
-platform.o: libbsc/platform/platform.cpp
-	$(CC) $(CFLAGS) -c libbsc/platform/platform.cpp
+preprocessing.o: libbsc/filters/preprocessing.cpp
+	$(CC) $(CFLAGS) -c libbsc/filters/preprocessing.cpp
 
 libbsc.o: libbsc/libbsc/libbsc.cpp
 	$(CC) $(CFLAGS) -c libbsc/libbsc/libbsc.cpp
 
-adler32.o: libbsc/adler32/adler32.cpp
-	$(CC) $(CFLAGS) -c libbsc/adler32/adler32.cpp
-
-qlfc.o: libbsc/qlfc/qlfc.cpp
-	$(CC) $(CFLAGS) -c libbsc/qlfc/qlfc.cpp
-
-bwt.o: libbsc/bwt/bwt.cpp
-	$(CC) $(CFLAGS) -c libbsc/bwt/bwt.cpp
-
 lzp.o: libbsc/lzp/lzp.cpp
 	$(CC) $(CFLAGS) -c libbsc/lzp/lzp.cpp
+
+platform.o: libbsc/platform/platform.cpp
+	$(CC) $(CFLAGS) -c libbsc/platform/platform.cpp
 
 st.o: libbsc/st/st.cpp
 	$(CC) $(CFLAGS) -c libbsc/st/st.cpp

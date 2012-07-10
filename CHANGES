@@ -1,3 +1,6 @@
+Changes in 3.1.0 (July 8, 2012)
+- Added Kepler GPU support with CUDA Toolkit 4.2
+
 Changes in 3.0.0 (August 26, 2011)
 - NVIDIA GPU acceleration of forward ST algorithms
 - Added Sort Transform of order 7 & 8 (GPU only)

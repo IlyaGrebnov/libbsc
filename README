@@ -10,7 +10,7 @@ block-sorting data compression algorithms.
 libbsc is a library based on bsc, it uses the same algorithms
 as bsc and enables you to compress memory blocks.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -48,16 +48,21 @@ Compression and decompression requirements are the same and in bytes, can
 be estimated as 16Mb + 5 x block size x number of blocks processed in parallel.
 
 GPU memory usage for NVIDIA CUDA technology is different from CPU memory usage
-and can be estimated as (16 + 2 * number of blocks processed in parallel) x block size.
+and can be estimated as 20 x block size.
 
 
 NVIDIA GPU acceleration:
 ------------------------
 
-libbsc uses NVIDIA CUDA technology, resulting in a performance boost on computers
+1. libbsc uses NVIDIA CUDA technology, resulting in a performance boost on computers
 with NVIDIA GPU of compute capability 1.1 or higher. Lists of supported GPUs
 can be found on the NVIDIA website http://developer.nvidia.com/cuda-gpus.
 You also need to install latest graphics drivers that support CUDA.
+
+2. Individual kernels are limited to a 2-second runtime by Windows. Kernels that run for
+longer than 2 seconds will trigger the Timeout Detection and Recovery (TDR) mechanism.
+Detailed information on disabling the Windows TDR is available at:
+http://msdn.microsoft.com/en-us/windows/hardware/gg487368.aspx#E2
 
 
 Sort Transform:
@@ -77,6 +82,7 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 Back 40 Computing:
 ------------------
+
 The Back 40 Computing project is a collection of fast, efficient GPU
 primitives. This project implements a very fast, efficient radix sorting
 method for CUDA-capable devices. libbsc uses the Back 40 Computing

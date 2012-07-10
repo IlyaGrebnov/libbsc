@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -32,8 +32,8 @@ See also the bsc and libbsc web site:
 
 --*/
 
-#ifndef _LIBBSC_QLFC_PREDICTOR_H
-#define _LIBBSC_QLFC_PREDICTOR_H
+#ifndef _LIBBSC_CODER_PREDICTOR_H
+#define _LIBBSC_CODER_PREDICTOR_H
 
 #include "../../platform/platform.h"
 

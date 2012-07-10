@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -52,6 +52,18 @@ See also the bsc and libbsc web site:
     #define INLINE /* */
 #endif
 
+#if defined(__GNUC__) && (__GNUC__ >= 4 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4))
+    #define RESTRICT __restrict__
+#elif defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 600)
+    #define RESTRICT __restrict
+#elif defined(_MSC_VER) && (_MSC_VER >= 1400)
+    #define RESTRICT __restrict
+#elif defined(__CUDACC__) && (CUDA_VERSION >= 3000)
+    #define RESTRICT __restrict__
+#else
+    #define RESTRICT /* */
+#endif
+
 #define ALPHABET_SIZE (256)
 
 #ifdef __cplusplus
@@ -92,5 +104,5 @@ extern "C" {
 #endif
 
 /*-----------------------------------------------------------*/
-/* End                                              common.h */
+/* End                                            platform.h */
 /*-----------------------------------------------------------*/

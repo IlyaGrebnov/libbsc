@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-Copyright (c) 2009-2011 Ilya Grebnov <ilya.grebnov@gmail.com>
+Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
 
 See file AUTHORS for a full list of contributors.
 
@@ -40,19 +40,24 @@ See also the bsc and libbsc web site:
 #include "../platform/platform.h"
 #include "../libbsc.h"
 
-#include "core/tables.h"
+#include "tables.h"
 
 #define DETECTORS_MAX_RECORD_SIZE   4
 #define DETECTORS_NUM_BLOCKS        48
 #define DETECTORS_BLOCK_SIZE        24576
 
-struct BscBlockModel
+struct BscSegmentationModel
 {
     struct
     {
-        int leftCount, rightCount;
-        int leftFrequencies[ALPHABET_SIZE];
-        int rightFrequencies[ALPHABET_SIZE];
+        int left, right;
+    } contextsCount[ALPHABET_SIZE];
+    struct
+    {
+        struct
+        {
+            int left, right;
+        } Frequencies[ALPHABET_SIZE];
     } contexts[ALPHABET_SIZE];
 };
 
@@ -60,50 +65,50 @@ struct BscReorderingModel
 {
     struct
     {
-        int count;
         int frequencies[ALPHABET_SIZE];
     } contexts[DETECTORS_MAX_RECORD_SIZE][ALPHABET_SIZE];
 };
 
-int bsc_detect_segments_serial(BscBlockModel * model, const unsigned char * input, int n)
+int bsc_detect_segments_serial(BscSegmentationModel * RESTRICT model, const unsigned char * RESTRICT input, int n)
 {
-    memset(model, 0, sizeof(BscBlockModel));
+    memset(model, 0, sizeof(BscSegmentationModel));
 
     for (int context = 0, i = 0; i < n; ++i)
     {
         unsigned char symbol = input[i];
-        model->contexts[context].rightFrequencies[symbol]++;
+        model->contexts[context].Frequencies[symbol].right++;
         context = (unsigned char)((context << 5) ^ symbol);
     }
 
     long long entropy = 0;
     for (int context = 0; context < ALPHABET_SIZE; ++context)
     {
+        int count = 0;
         for (int symbol = 0; symbol < ALPHABET_SIZE; ++symbol)
         {
-            model->contexts[context].rightCount += model->contexts[context].rightFrequencies[symbol];
-            entropy -= bsc_entropy(model->contexts[context].rightFrequencies[symbol]);
+            int frequency = model->contexts[context].Frequencies[symbol].right;
+            count += frequency; entropy -= bsc_entropy(frequency);
         }
-        entropy += bsc_entropy(model->contexts[context].rightCount);
+        model->contextsCount[context].right = count; entropy += bsc_entropy(count);
     }
 
     int blockSize = n;
 
-    long long leftEntropy = 0, rightEntropy = entropy, bestEntropy = entropy - (entropy >> 5) - (65536LL * 12 * 1024);
+    long long localEntropy = entropy, bestEntropy = entropy - (entropy >> 5) - (65536LL * 12 * 1024);
     for (int context = 0, i = 0; i < n; ++i)
     {
-        if (rightEntropy + leftEntropy < bestEntropy)
+        if (localEntropy < bestEntropy)
         {
-            bestEntropy = rightEntropy + leftEntropy;
+            bestEntropy = localEntropy;
             blockSize   = i;
         }
 
         unsigned char symbol = input[i];
 
-        rightEntropy    += bsc_delta(--model->contexts[context].rightFrequencies[symbol]);
-        leftEntropy     -= bsc_delta(model->contexts[context].leftFrequencies[symbol]++);
-        rightEntropy    -= bsc_delta(--model->contexts[context].rightCount);
-        leftEntropy     += bsc_delta(model->contexts[context].leftCount++);
+        localEntropy    += bsc_delta(--model->contexts[context].Frequencies[symbol].right);
+        localEntropy    -= bsc_delta(model->contexts[context].Frequencies[symbol].left++);
+        localEntropy    -= bsc_delta(--model->contextsCount[context].right);
+        localEntropy    += bsc_delta(model->contextsCount[context].left++);
 
         context = (unsigned char)((context << 5) ^ symbol);
     }
@@ -113,9 +118,9 @@ int bsc_detect_segments_serial(BscBlockModel * model, const unsigned char * inpu
 
 #ifdef LIBBSC_OPENMP
 
-int bsc_detect_segments_parallel(BscBlockModel * model0, BscBlockModel * model1, const unsigned char * input, int n)
+int bsc_detect_segments_parallel(BscSegmentationModel * RESTRICT model0, BscSegmentationModel * RESTRICT model1, const unsigned char * RESTRICT input, int n)
 {
-    int globalBlockSize = n; long long globalBestEntropy;
+    int globalBlockSize = n; long long globalEntropy, globalBestEntropy;
 
     #pragma omp parallel num_threads(2)
     {
@@ -133,25 +138,25 @@ int bsc_detect_segments_parallel(BscBlockModel * model0, BscBlockModel * model1,
             {
                 if (threadId == 0)
                 {
-                    memset(model0, 0, sizeof(BscBlockModel));
+                    memset(model0, 0, sizeof(BscSegmentationModel));
 
                     int context = 0;
                     for (int i = 0; i < median; ++i)
                     {
                         unsigned char symbol = input[i];
-                        model0->contexts[context].rightFrequencies[symbol]++;
+                        model0->contexts[context].Frequencies[symbol].right++;
                         context = (unsigned char)((context << 5) ^ symbol);
                     }
                 }
                 else
                 {
-                    memset(model1, 0, sizeof(BscBlockModel));
+                    memset(model1, 0, sizeof(BscSegmentationModel));
 
                     int context = (unsigned char)((input[median - 2] << 5) ^ input[median - 1]);
                     for (int i = median; i < n; ++i)
                     {
                         unsigned char symbol = input[i];
-                        model1->contexts[context].leftFrequencies[symbol]++;
+                        model1->contexts[context].Frequencies[symbol].left++;
                         context = (unsigned char)((context << 5) ^ symbol);
                     }
                 }
@@ -168,70 +173,71 @@ int bsc_detect_segments_parallel(BscBlockModel * model0, BscBlockModel * model1,
                         int count = 0;
                         for (int symbol = 0; symbol < ALPHABET_SIZE; ++symbol)
                         {
-                            int frequency = model0->contexts[context].rightFrequencies[symbol] + model1->contexts[context].leftFrequencies[symbol];
-                            model0->contexts[context].rightFrequencies[symbol] = model1->contexts[context].leftFrequencies[symbol] = frequency;
+                            int frequency = model0->contexts[context].Frequencies[symbol].right + model1->contexts[context].Frequencies[symbol].left;
+                            model0->contexts[context].Frequencies[symbol].right = model1->contexts[context].Frequencies[symbol].left = frequency;
 
-                            entropy -= bsc_entropy(frequency); count += frequency;
+                            count += frequency; entropy -= bsc_entropy(frequency);
                         }
-                        entropy += bsc_entropy(count); model0->contexts[context].rightCount = model1->contexts[context].leftCount = count;
+                        model0->contextsCount[context].right = model1->contextsCount[context].left = count; entropy += bsc_entropy(count);
                     }
 
-                    globalBestEntropy = entropy;
+                    globalEntropy = entropy; globalBestEntropy = entropy - (entropy >> 5) - (65536LL * 12 * 1024);
                 }
             }
 
             {
-                int localBlockSize = n; long long localBestEntropy = globalBestEntropy - (globalBestEntropy >> 5) - (65536LL * 12 * 1024);
-
-                #pragma omp barrier
+                int localBlockSize = n; long long localBestEntropy = globalEntropy - (globalEntropy >> 5) - (65536LL * 12 * 1024);
 
                 if (threadId == 0)
                 {
-                    long long leftEntropy = 0, rightEntropy = globalBestEntropy;
+                    long long localEntropy = globalEntropy;
                     for (int context = 0, i = 0; i < median; ++i)
                     {
-                        if (rightEntropy + leftEntropy < localBestEntropy)
+                        if (localEntropy < localBestEntropy)
                         {
-                            localBestEntropy = rightEntropy + leftEntropy;
+                            localBestEntropy = localEntropy;
                             localBlockSize   = i;
                         }
 
                         unsigned char symbol = input[i];
 
-                        rightEntropy    += bsc_delta(--model0->contexts[context].rightFrequencies[symbol]);
-                        leftEntropy     -= bsc_delta(model0->contexts[context].leftFrequencies[symbol]++);
-                        rightEntropy    -= bsc_delta(--model0->contexts[context].rightCount);
-                        leftEntropy     += bsc_delta(model0->contexts[context].leftCount++);
+                        localEntropy    += bsc_delta(--model0->contexts[context].Frequencies[symbol].right);
+                        localEntropy    -= bsc_delta(model0->contexts[context].Frequencies[symbol].left++);
+                        localEntropy    -= bsc_delta(--model0->contextsCount[context].right);
+                        localEntropy    += bsc_delta(model0->contextsCount[context].left++);
 
                         context = (unsigned char)((context << 5) ^ symbol);
                     }
                 }
                 else
                 {
-                    long long leftEntropy = globalBestEntropy, rightEntropy = 0;
+                    long long localEntropy = globalEntropy;
                     for (int i = n - 1; i >= median; --i)
                     {
                         unsigned char   symbol  = input[i];
                         int             context = (unsigned char)((input[i - 2] << 5) ^ input[i - 1]);
 
-                        rightEntropy    -= bsc_delta(model1->contexts[context].rightFrequencies[symbol]++);
-                        leftEntropy     += bsc_delta(--model1->contexts[context].leftFrequencies[symbol]);
-                        rightEntropy    += bsc_delta(model1->contexts[context].rightCount++);
-                        leftEntropy     -= bsc_delta(--model1->contexts[context].leftCount);
+                        localEntropy    -= bsc_delta(model1->contexts[context].Frequencies[symbol].right++);
+                        localEntropy    += bsc_delta(--model1->contexts[context].Frequencies[symbol].left);
+                        localEntropy    += bsc_delta(model1->contextsCount[context].right++);
+                        localEntropy    -= bsc_delta(--model1->contextsCount[context].left);
 
-                        if (rightEntropy + leftEntropy < localBestEntropy)
+                        if (localEntropy <= localBestEntropy)
                         {
-                            localBestEntropy = rightEntropy + leftEntropy;
+                            localBestEntropy = localEntropy;
                             localBlockSize   = i;
                         }
                     }
                 }
 
-                #pragma omp critical
+                if (globalBestEntropy > localBestEntropy)
                 {
-                    if (globalBestEntropy > localBestEntropy)
+                    #pragma omp critical
                     {
-                        globalBlockSize = localBlockSize; globalBestEntropy = localBestEntropy;
+                        if (globalBestEntropy > localBestEntropy)
+                        {
+                            globalBlockSize = localBlockSize; globalBestEntropy = localBestEntropy;
+                        }
                     }
                 }
             }
@@ -244,7 +250,7 @@ int bsc_detect_segments_parallel(BscBlockModel * model0, BscBlockModel * model1,
 
 #endif
 
-int bsc_detect_segments_recursive(BscBlockModel * model0, BscBlockModel * model1, const unsigned char * input, int n, int * segments, int k, int features)
+int bsc_detect_segments_recursive(BscSegmentationModel * model0, BscSegmentationModel * model1, const unsigned char * input, int n, int * segments, int k, int features)
 {
     if (n < DETECTORS_BLOCK_SIZE || k == 1)
     {
@@ -291,9 +297,9 @@ int bsc_detect_segments(const unsigned char * input, int n, int * segments, int 
         return 1;
     }
 
-    if (BscBlockModel * model0 = (BscBlockModel *)bsc_malloc(sizeof(BscBlockModel)))
+    if (BscSegmentationModel * model0 = (BscSegmentationModel *)bsc_malloc(sizeof(BscSegmentationModel)))
     {
-        if (BscBlockModel * model1 = (BscBlockModel *)bsc_malloc(sizeof(BscBlockModel)))
+        if (BscSegmentationModel * model1 = (BscSegmentationModel *)bsc_malloc(sizeof(BscSegmentationModel)))
         {
             int result = bsc_detect_segments_recursive(model0, model1, input, n, segments, k, features);
 
@@ -353,7 +359,7 @@ static long long bsc_estimate_contextsorder(const unsigned char * input, int n)
     return entropy;
 }
 
-int bsc_detect_contextsorder(const unsigned char * input, int n, int features)
+int bsc_detect_contextsorder(const unsigned char * RESTRICT input, int n, int features)
 {
     int sortingContexts = LIBBSC_NOT_ENOUGH_MEMORY;
 
@@ -376,11 +382,11 @@ int bsc_detect_contextsorder(const unsigned char * input, int n, int features)
         return sortingContexts;
     }
 
-    if (unsigned char * buffer = (unsigned char *)bsc_malloc(n * sizeof(unsigned char)))
+    if (unsigned char * RESTRICT buffer = (unsigned char *)bsc_malloc(n * sizeof(unsigned char)))
     {
-        if (int * bucket0 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+        if (int * RESTRICT bucket0 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
-            if (int * bucket1 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
+            if (int * RESTRICT bucket1 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
             {
                 unsigned char C0 = input[n - 1];
                 for (int i = 0; i < n; ++i)
@@ -454,7 +460,7 @@ long long bsc_estimate_reordering(BscReorderingModel * model, int recordSize)
     return entropy;
 }
 
-int bsc_detect_recordsize(const unsigned char * input, int n, int features)
+int bsc_detect_recordsize(const unsigned char * RESTRICT input, int n, int features)
 {
     int result = LIBBSC_NOT_ENOUGH_MEMORY;
 
@@ -477,7 +483,7 @@ int bsc_detect_recordsize(const unsigned char * input, int n, int features)
         return result;
     }
 
-    if (BscReorderingModel * model = (BscReorderingModel *)bsc_malloc(sizeof(BscReorderingModel)))
+    if (BscReorderingModel * RESTRICT model = (BscReorderingModel *)bsc_malloc(sizeof(BscReorderingModel)))
     {
         long long Entropy[DETECTORS_MAX_RECORD_SIZE];
 
