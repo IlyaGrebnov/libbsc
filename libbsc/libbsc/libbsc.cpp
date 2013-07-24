@@ -116,8 +116,8 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
 
     switch (coder)
     {
-        case LIBBSC_CODER_QLFC_STATIC:   mode += (LIBBSC_CODER_QLFC_STATIC   << 5); break;
-        case LIBBSC_CODER_QLFC_ADAPTIVE: mode += (LIBBSC_CODER_QLFC_ADAPTIVE << 5); break;
+        case LIBBSC_CODER_QLFC_STATIC   : mode += (LIBBSC_CODER_QLFC_STATIC   << 5); break;
+        case LIBBSC_CODER_QLFC_ADAPTIVE : mode += (LIBBSC_CODER_QLFC_ADAPTIVE << 5); break;
 
         default : return LIBBSC_BAD_PARAMETER;
     }
@@ -250,8 +250,8 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
 
     switch (coder)
     {
-        case LIBBSC_CODER_QLFC_STATIC:   mode += (LIBBSC_CODER_QLFC_STATIC   << 5); break;
-        case LIBBSC_CODER_QLFC_ADAPTIVE: mode += (LIBBSC_CODER_QLFC_ADAPTIVE << 5); break;
+        case LIBBSC_CODER_QLFC_STATIC   : mode += (LIBBSC_CODER_QLFC_STATIC   << 5); break;
+        case LIBBSC_CODER_QLFC_ADAPTIVE : mode += (LIBBSC_CODER_QLFC_ADAPTIVE << 5); break;
 
         default : return LIBBSC_BAD_PARAMETER;
     }
@@ -388,10 +388,10 @@ int bsc_block_info(const unsigned char * blockHeader, int headerSize, int * pBlo
 
     switch (coder)
     {
-        case LIBBSC_CODER_QLFC_STATIC:   test_mode += (LIBBSC_CODER_QLFC_STATIC   << 5); break;
-        case LIBBSC_CODER_QLFC_ADAPTIVE: test_mode += (LIBBSC_CODER_QLFC_ADAPTIVE << 5); break;
+        case LIBBSC_CODER_QLFC_STATIC   : test_mode += (LIBBSC_CODER_QLFC_STATIC   << 5); break;
+        case LIBBSC_CODER_QLFC_ADAPTIVE : test_mode += (LIBBSC_CODER_QLFC_ADAPTIVE << 5); break;
 
-        default : return LIBBSC_BAD_PARAMETER;
+        default : if (coder > 0) return LIBBSC_DATA_CORRUPT;
     }
 
     if (lzpMinLen != 0 || lzpHashSize != 0)
