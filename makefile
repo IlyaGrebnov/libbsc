@@ -65,15 +65,15 @@ libbsc.a: $(OBJS)
 	fi
 
 install: libbsc.a bsc
-	if ( test ! -d $(PREFIX)/bin ) ; then mkdir -p $(PREFIX)/bin ; fi
-	if ( test ! -d $(PREFIX)/lib ) ; then mkdir -p $(PREFIX)/lib ; fi
-	if ( test ! -d $(PREFIX)/include ) ; then mkdir -p $(PREFIX)/include ; fi
-	cp -f bsc $(PREFIX)/bin/bsc
-	chmod a+x $(PREFIX)/bin/bsc
-	cp -f libbsc/libbsc.h $(PREFIX)/include
-	chmod a+r $(PREFIX)/include/libbsc.h
-	cp -f libbsc.a $(PREFIX)/lib
-	chmod a+r $(PREFIX)/lib/libbsc.a
+	if ( test ! -d $(DESTDIR)$(PREFIX)/bin ) ; then mkdir -p $(DESTDIR)$(PREFIX)/bin ; fi
+	if ( test ! -d $(DESTDIR)$(PREFIX)/lib ) ; then mkdir -p $(DESTDIR)$(PREFIX)/lib ; fi
+	if ( test ! -d $(DESTDIR)$(PREFIX)/include ) ; then mkdir -p $(DESTDIR)$(PREFIX)/include ; fi
+	cp -f bsc $(DESTDIR)$(PREFIX)/bin/bsc
+	chmod a+x $(DESTDIR)$(PREFIX)/bin/bsc
+	cp -f libbsc/libbsc.h $(DESTDIR)$(PREFIX)/include
+	chmod a+r $(DESTDIR)$(PREFIX)/include/libbsc.h
+	cp -f libbsc.a $(DESTDIR)$(PREFIX)/lib
+	chmod a+r $(DESTDIR)$(PREFIX)/lib/libbsc.a
 
 clean:
 	rm -f *.o libbsc.a bsc
