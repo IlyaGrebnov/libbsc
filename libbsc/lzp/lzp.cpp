@@ -179,21 +179,9 @@ int bsc_lzp_decode_block(const unsigned char * input, const unsigned char * inpu
                     const unsigned char * reference = outputStart + value;
                           unsigned char * outputEnd = output + len;
 
-                    if (output - reference < 4)
-                    {
-                        int offset[4] = {0, 3, 2, 3};
+                    while (output < outputEnd) *output++ = *reference++;
 
-                        *output++ = *reference++;
-                        *output++ = *reference++;
-                        *output++ = *reference++;
-                        *output++ = *reference++;
-
-                        reference -= offset[output - reference];
-                    }
-
-                    while (output < outputEnd) { *(unsigned int *)output = *(unsigned int*)reference; output += 4; reference += 4; }
-
-                    output = outputEnd; context = output[-1] | (output[-2] << 8) | (output[-3] << 16) | (output[-4] << 24);
+                    context = output[-1] | (output[-2] << 8) | (output[-3] << 16) | (output[-4] << 24);
                 }
                 else
                 {
