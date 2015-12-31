@@ -58,11 +58,11 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #include "../coder/coder.h"
 #include "../st/st.h"
 
-int bsc_init(int features)
+int bsc_init_full(int features, void* (* malloc)(size_t size), void* (* zero_malloc)(size_t size), void (* free)(void* address))
 {
     int result = LIBBSC_NO_ERROR;
 
-    if (result == LIBBSC_NO_ERROR) result = bsc_platform_init(features);
+    if (result == LIBBSC_NO_ERROR) result = bsc_platform_init(features, malloc, zero_malloc, free);
     if (result == LIBBSC_NO_ERROR) result = bsc_coder_init(features);
 
 #ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
@@ -72,6 +72,11 @@ int bsc_init(int features)
 #endif
 
     return result;
+}
+
+int bsc_init(int features)
+{
+    return bsc_init_full(features, NULL, NULL, NULL);
 }
 
 int bsc_store(const unsigned char * input, unsigned char * output, int n, int features)

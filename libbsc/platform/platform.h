@@ -70,10 +70,13 @@ extern "C" {
 
     /**
     * You should call this function before you call any of the other platform specific functions.
+    * @param malloc - function to use to allocate buffers
+    * @param zero_malloc - function to use to allocate zero-filled buffers
+    * @param free - function used to free buffers
     * @param features   - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
     */
-    int bsc_platform_init(int features);
+    int bsc_platform_init(int features, void* (* malloc)(size_t size), void* (* zero_malloc)(size_t size), void (* free)(void* address));
 
     /**
     * Allocates memory blocks.
