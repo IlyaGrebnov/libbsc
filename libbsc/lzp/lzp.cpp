@@ -79,7 +79,11 @@ int bsc_lzp_encode_block(const unsigned char * input, const unsigned char * inpu
             if (value > 0)
             {
                 const unsigned char * reference = inputStart + value;
+#if defined(BSC_ALLOW_UNALIGNED)
                 if ((*(unsigned int *)(input + minLen - 4) == *(unsigned int *)(reference + minLen - 4)) && (*(unsigned int *)(input) == *(unsigned int *)(reference)))
+#else
+                if ((memcmp(input + minLen - 4, reference + minLen - 4, sizeof(unsigned int)) == 0) && (memcmp(input, reference, sizeof(unsigned int)) == 0))
+#endif
                 {
                     if ((heuristic > input) && (*(unsigned int *)heuristic != *(unsigned int *)(reference + (heuristic - input))))
                     {
@@ -229,9 +233,13 @@ int bsc_lzp_compress_serial(const unsigned char * input, unsigned char * output,
             if (outputPtr + inputSize >= n) return LIBBSC_NOT_COMPRESSIBLE;
             result = inputSize; memcpy(output + outputPtr, input + inputStart, inputSize);
         }
-
+#if defined(BSC_ALLOW_UNALIGNED)
         *(int *)(output + 1 + 8 * blockId + 0) = inputSize;
         *(int *)(output + 1 + 8 * blockId + 4) = result;
+#else
+        memcpy(output + 1 + 8 * blockId + 0, &inputSize, sizeof(int));
+        memcpy(output + 1 + 8 * blockId + 4, &result, sizeof(int));
+#endif
 
         outputPtr += result;
     }
