@@ -62,12 +62,22 @@ private:
 
     INLINE void OutputShort(unsigned short s)
     {
+#if defined(BSC_ALLOW_UNALIGNED)
         *ari_output++ = s;
+#else
+        memcpy(ari_output++, &s, sizeof(unsigned short));
+#endif
     };
 
     INLINE unsigned short InputShort()
     {
+#if defined(BSC_ALLOW_UNALIGNED)
         return *ari_input++;
+#else
+        unsigned short ret;
+        memcpy(&ret, ari_input++, sizeof(unsigned short));
+        return ret;
+#endif
     };
 
     INLINE void ShiftLow()

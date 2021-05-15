@@ -139,8 +139,13 @@ int bsc_coder_compress_serial(const unsigned char * input, unsigned char * outpu
             result = inputSize; memcpy(output + outputPtr, input + inputStart, inputSize);
         }
 
+#if defined(BSC_ALLOW_UNALIGNED)
         *(int *)(output + 1 + 8 * blockId + 0) = inputSize;
         *(int *)(output + 1 + 8 * blockId + 4) = result;
+#else
+        memcpy(output + 1 + 8 * blockId + 0, &inputSize, sizeof(int));
+        memcpy(output + 1 + 8 * blockId + 4, &result, sizeof(int));
+#endif
 
         outputPtr += result;
     }
