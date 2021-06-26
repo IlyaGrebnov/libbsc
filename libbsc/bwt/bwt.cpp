@@ -66,7 +66,7 @@ int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * 
         }
 
         num_indexes[0] = (unsigned char)((n - 1) / (mod + 1));
-        index = indexes[0]; memcpy(&indexes[0], &indexes[1], num_indexes[0] * sizeof(int));
+        index = indexes[0]; for (int t = 0; t < num_indexes[0]; ++t) indexes[t] = indexes[t + 1] - 1;
 
         return index;
     }
