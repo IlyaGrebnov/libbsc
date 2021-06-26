@@ -6,19 +6,6 @@ RANLIB = ranlib
 
 CFLAGS = -g -Wall
 
-# Sort Transform is patented by Michael Schindler under US patent 6,199,064.
-# However for research purposes this algorithm is included in this software.
-# So if you are of the type who should worry about this (making money) worry away.
-# The author shall have no liability with respect to the infringement of
-# copyrights, trade secrets or any patents by this software. In no event will
-# the author be liable for any lost revenue or profits or other special,
-# indirect and consequential damages.
-
-# Sort Transform is disabled by default and can be enabled by defining the
-# preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
-
-#CFLAGS += -DLIBBSC_SORT_TRANSFORM_SUPPORT
-
 # Comment out CFLAGS line below for compatability mode for 32bit file sizes
 # (less than 2GB) and systems that have compilers that treat int as 64bit
 # natively (ie: modern AIX)
@@ -33,12 +20,18 @@ CFLAGS += -fopenmp -DLIBBSC_OPENMP_SUPPORT
 # Comment out CFLAGS line below to enable debug output
 CFLAGS += -DNDEBUG
 
+# Comment out CFLAGS line below to disable Sort Transform
+CFLAGS += -DLIBBSC_SORT_TRANSFORM_SUPPORT
+
+# Comment out CFLAGS line below to disable unaligned memory access
+CFLAGS += -DLIBBSC_ALLOW_UNALIGNED_ACCESS
+
 # Where you want bsc installed when you do 'make install'
 PREFIX = /usr
 
 OBJS = \
        adler32.o       \
-       divsufsort.o    \
+       libsais.o       \
        bwt.o           \
        coder.o         \
        qlfc.o          \
@@ -81,8 +74,8 @@ clean:
 adler32.o: libbsc/adler32/adler32.cpp
 	$(CC) $(CFLAGS) -c libbsc/adler32/adler32.cpp
 
-divsufsort.o: libbsc/bwt/divsufsort/divsufsort.c
-	$(CC) $(CFLAGS) -c libbsc/bwt/divsufsort/divsufsort.c
+libsais.o: libbsc/bwt/libsais/libsais.c
+	$(CC) $(CFLAGS) -c libbsc/bwt/libsais/libsais.c
 
 bwt.o: libbsc/bwt/bwt.cpp
 	$(CC) $(CFLAGS) -c libbsc/bwt/bwt.cpp

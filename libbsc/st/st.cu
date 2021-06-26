@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-   Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
+   Copyright (c) 2009-2021 Ilya Grebnov <ilya.grebnov@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -30,27 +30,13 @@ See also the bsc and libbsc web site:
 
 --*/
 
-/*--
-
-Sort Transform is patented by Michael Schindler under US patent 6,199,064.
-However for research purposes this algorithm is included in this software.
-So if you are of the type who should worry about this (making money) worry away.
-The author shall have no liability with respect to the infringement of
-copyrights, trade secrets or any patents by this software. In no event will
-the author be liable for any lost revenue or profits or other special,
-indirect and consequential damages.
-
-Sort Transform is disabled by default and can be enabled by defining the
-preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
-
---*/
-
 #if defined(LIBBSC_SORT_TRANSFORM_SUPPORT) && defined(LIBBSC_CUDA_SUPPORT)
 
 #if defined(_MSC_VER)
   #pragma warning(disable : 4267)
 #endif
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
 
@@ -59,11 +45,11 @@ preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 #include "../libbsc.h"
 #include "../platform/platform.h"
 
+#include <cuda.h>
 #include <cuda_runtime_api.h>
-#include <device_functions.h>
+#include <device_launch_parameters.h>
 
-#include "b40c/radix_sort/enactor.cuh"
-#include "b40c/util/multi_buffer.cuh"
+#include <cub/cub.cuh>
 
 #ifdef LIBBSC_OPENMP
 
@@ -90,26 +76,21 @@ int bsc_st_cuda_init(int features)
 #endif
 
 #define CUDA_DEVICE_PADDING             1024
-#define CUDA_NUM_THREADS_IN_BLOCK       192
-
-#define CUDA_CTA_OCCUPANCY_SM30         10
-#define CUDA_CTA_OCCUPANCY_SM20         8
-#define CUDA_CTA_OCCUPANCY_SM12         5
-#define CUDA_CTA_OCCUPANCY_SM10         4
-#define CUDA_CTA_OCCUPANCY(v)           (v >= 300 ? CUDA_CTA_OCCUPANCY_SM30 : v >= 200 ? CUDA_CTA_OCCUPANCY_SM20 : v >= 120 ? CUDA_CTA_OCCUPANCY_SM12 : CUDA_CTA_OCCUPANCY_SM10)
+#define CUDA_NUM_THREADS_IN_BLOCK       128
+#define CUDA_CTA_OCCUPANCY              8
 
 cudaError_t bsc_cuda_safe_call(const char * filename, int line, cudaError_t result, cudaError_t status = cudaSuccess)
 {
     if (result != cudaSuccess)
     {
-		fprintf(stderr, "\n%s(%d): bsc_cuda_safe_call failed %d: '%s'.", filename, line, result, cudaGetErrorString(result));
-		fflush(stderr);
+        fprintf(stderr, "\n%s(%d): bsc_cuda_safe_call failed %d: '%s'.", filename, line, result, cudaGetErrorString(result));
+        fflush(stderr);
     }
 
     return result != cudaSuccess ? result : status;
 }
 
-__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY(CUDA_DEVICE_ARCH))
+__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY)
 void bsc_st567_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned long long * RESTRICT K_device, int n)
 {
     __shared__ unsigned int staging[1 + CUDA_NUM_THREADS_IN_BLOCK + 7];
@@ -124,7 +105,7 @@ void bsc_st567_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned l
             if (threadIdx.x < 7 ) thread_staging[1 + CUDA_NUM_THREADS_IN_BLOCK] = T_device[index + CUDA_NUM_THREADS_IN_BLOCK]; else
             if (threadIdx.x == 7) thread_staging[-7                           ] = T_device[index - 8                        ];
 
-            syncthreads();
+            __syncthreads();
         }
 
         {
@@ -138,12 +119,12 @@ void bsc_st567_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned l
 
             K_device[index] = (((unsigned long long)hi) << 32) | ((unsigned long long)lo);
 
-            syncthreads();
+            __syncthreads();
         }
     }
 }
 
-__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY(CUDA_DEVICE_ARCH))
+__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY)
 void bsc_st8_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned long long * RESTRICT K_device, unsigned char * RESTRICT V_device, int n)
 {
     __shared__ unsigned int staging[1 + CUDA_NUM_THREADS_IN_BLOCK + 8];
@@ -158,7 +139,7 @@ void bsc_st8_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned lon
             if (threadIdx.x < 8 ) thread_staging[1 + CUDA_NUM_THREADS_IN_BLOCK] = T_device[index + CUDA_NUM_THREADS_IN_BLOCK]; else
             if (threadIdx.x == 8) thread_staging[-8                           ] = T_device[index - 9                        ];
 
-            syncthreads();
+            __syncthreads();
         }
 
         {
@@ -172,12 +153,12 @@ void bsc_st8_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned lon
 
             K_device[index] = (((unsigned long long)hi) << 32) | ((unsigned long long)lo); V_device[index] = thread_staging[0];
 
-            syncthreads();
+            __syncthreads();
         }
     }
 }
 
-__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY(CUDA_DEVICE_ARCH))
+__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY)
 void bsc_st567_encode_cuda_postsort(unsigned char * RESTRICT T_device, unsigned long long * RESTRICT K_device, int n, unsigned long long lookup, int * RESTRICT I_device)
 {
     int min_index = n;
@@ -193,10 +174,10 @@ void bsc_st567_encode_cuda_postsort(unsigned char * RESTRICT T_device, unsigned 
         }
     }
 
-    syncthreads(); if (min_index != n) atomicMin(I_device, min_index);
+    __syncthreads(); if (min_index != n) atomicMin(I_device, min_index);
 }
 
-__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY(CUDA_DEVICE_ARCH))
+__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY)
 void bsc_st8_encode_cuda_postsort(unsigned long long * RESTRICT K_device, int n, unsigned long long lookup, int * RESTRICT I_device)
 {
     int min_index = n;
@@ -208,7 +189,7 @@ void bsc_st8_encode_cuda_postsort(unsigned long long * RESTRICT K_device, int n,
         }
     }
 
-    syncthreads(); if (min_index != n) atomicMin(I_device, min_index);
+    __syncthreads(); if (min_index != n) atomicMin(I_device, min_index);
 }
 
 int bsc_st567_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int num_blocks, int k)
@@ -220,26 +201,31 @@ int bsc_st567_encode_cuda(unsigned char * T, unsigned char * T_device, int n, in
 
         if (bsc_cuda_safe_call(__FILE__, __LINE__, cudaMalloc((void **)&K_device, 2 * (n + 2 * CUDA_DEVICE_PADDING) * sizeof(unsigned long long))) == cudaSuccess)
         {
-            index = LIBBSC_GPU_ERROR;
+            index              = LIBBSC_GPU_ERROR;
+            cudaError_t status = cudaSuccess;
 
             bsc_st567_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device, n);
 
-            cudaError_t status = cudaSuccess;
+            if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
             {
-                b40c::util::DoubleBuffer<unsigned long long> storage;
+                K_device_sorted = K_device + ((n + 2 * CUDA_DEVICE_PADDING) / CUDA_DEVICE_PADDING) * CUDA_DEVICE_PADDING;
+
+                cub::DoubleBuffer<unsigned long long> d_keys(K_device, K_device_sorted);
+
+                void * d_temp_storage = NULL; size_t temp_storage_bytes = 0;
+
+                status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortKeys(d_temp_storage, temp_storage_bytes, d_keys, n, (7 - k) * 8, 56), status);
+                if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                 {
-                    storage.d_keys[storage.selector ^ 0] = K_device;
-                    storage.d_keys[storage.selector ^ 1] = K_device + ((n + 2 * CUDA_DEVICE_PADDING) / CUDA_DEVICE_PADDING) * CUDA_DEVICE_PADDING;
+                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMalloc(&d_temp_storage, temp_storage_bytes), status);
+                    if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                    {
+                       status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortKeys(d_temp_storage, temp_storage_bytes, d_keys, n, (7 - k) * 8, 56), status);
+                       status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFree(d_temp_storage), status);
+                    }
                 }
 
-                {
-                    b40c::radix_sort::Enactor enactor;
-                    if (k == 5) status = enactor.Sort<b40c::radix_sort::LARGE_PROBLEM, 40, 16>(storage, n);
-                    if (k == 6) status = enactor.Sort<b40c::radix_sort::LARGE_PROBLEM, 48,  8>(storage, n);
-                    if (k == 7) status = enactor.Sort<b40c::radix_sort::LARGE_PROBLEM, 56,  0>(storage, n);
-
-                    K_device_sorted = storage.d_keys[storage.selector];
-                }
+                K_device_sorted = d_keys.Current();
             }
 
             if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
@@ -295,28 +281,34 @@ int bsc_st8_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int 
 
             if (bsc_cuda_safe_call(__FILE__, __LINE__, cudaMalloc((void **)&K_device, 2 * (n + 2 * CUDA_DEVICE_PADDING) * sizeof(unsigned long long))) == cudaSuccess)
             {
-                index = LIBBSC_GPU_ERROR;
+                index              = LIBBSC_GPU_ERROR;
+                cudaError_t status = cudaSuccess;
 
                 bsc_st8_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device, V_device, n);
 
-                cudaError_t status = cudaSuccess;
+                if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                 {
-                    b40c::util::DoubleBuffer<unsigned long long, unsigned char> storage;
+                    K_device_sorted = K_device + ((n + 2 * CUDA_DEVICE_PADDING) / CUDA_DEVICE_PADDING) * CUDA_DEVICE_PADDING;
+                    V_device_sorted = V_device + ((n + 2 * CUDA_DEVICE_PADDING) / CUDA_DEVICE_PADDING) * CUDA_DEVICE_PADDING;
+
+                    cub::DoubleBuffer<unsigned long long> d_keys(K_device, K_device_sorted);
+                    cub::DoubleBuffer<unsigned char>      d_values(V_device, V_device_sorted);
+
+                    void * d_temp_storage = NULL; size_t temp_storage_bytes = 0;
+
+                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, d_keys, d_values, n), status);
+                    if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                     {
-                        storage.d_keys  [storage.selector ^ 0] = K_device;
-                        storage.d_keys  [storage.selector ^ 1] = K_device + ((n + 2 * CUDA_DEVICE_PADDING) / CUDA_DEVICE_PADDING) * CUDA_DEVICE_PADDING;
-                        storage.d_values[storage.selector ^ 0] = V_device;
-                        storage.d_values[storage.selector ^ 1] = V_device + ((n + 2 * CUDA_DEVICE_PADDING) / CUDA_DEVICE_PADDING) * CUDA_DEVICE_PADDING;
+                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMalloc(&d_temp_storage, temp_storage_bytes), status);
+                        if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                        {
+                           status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, d_keys, d_values, n), status);
+                           status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFree(d_temp_storage), status);
+                        }
                     }
 
-                    {
-                        b40c::radix_sort::Enactor enactor;
-                        
-                        status = enactor.Sort(storage, n);
-
-                        K_device_sorted = storage.d_keys[storage.selector];
-                        V_device_sorted = storage.d_values[storage.selector];
-                    }
+                    K_device_sorted = d_keys.Current();
+                    V_device_sorted = d_values.Current();
                 }
 
                 if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
@@ -376,8 +368,9 @@ int bsc_st_encode_cuda(unsigned char * T, int n, int k, int features)
             }
         }
 
-        if (deviceProperties.major * 10 + deviceProperties.minor <= 10) return LIBBSC_GPU_NOT_SUPPORTED;
-        num_blocks = CUDA_CTA_OCCUPANCY(deviceProperties.major * 100 + deviceProperties.minor * 10) * deviceProperties.multiProcessorCount;
+        if (deviceProperties.major * 10 + deviceProperties.minor < 35) return LIBBSC_GPU_NOT_SUPPORTED;
+
+        num_blocks = CUDA_CTA_OCCUPANCY * deviceProperties.multiProcessorCount;
 
         if (num_blocks > ((n + CUDA_NUM_THREADS_IN_BLOCK - 1) / CUDA_NUM_THREADS_IN_BLOCK)) num_blocks = (n + CUDA_NUM_THREADS_IN_BLOCK - 1) / CUDA_NUM_THREADS_IN_BLOCK;
         if (num_blocks <= 0) num_blocks = 1;

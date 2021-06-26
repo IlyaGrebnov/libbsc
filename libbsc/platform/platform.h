@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-   Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
+   Copyright (c) 2009-2021 Ilya Grebnov <ilya.grebnov@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -50,14 +50,10 @@ See also the bsc and libbsc web site:
     #define INLINE /* */
 #endif
 
-#if defined(__GNUC__) && (__GNUC__ >= 4 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4))
+#if defined(__GNUC__) || defined(__clang__) || defined(__CUDACC__)
     #define RESTRICT __restrict__
-#elif defined(__INTEL_COMPILER) && (__INTEL_COMPILER >= 600)
+#elif defined(_MSC_VER) || defined(__INTEL_COMPILER)
     #define RESTRICT __restrict
-#elif defined(_MSC_VER) && (_MSC_VER >= 1400)
-    #define RESTRICT __restrict
-#elif defined(__CUDACC__) && (CUDA_VERSION >= 3000)
-    #define RESTRICT __restrict__
 #else
     #define RESTRICT /* */
 #endif

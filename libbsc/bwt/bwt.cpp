@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-   Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
+   Copyright (c) 2009-2021 Ilya Grebnov <ilya.grebnov@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -38,17 +38,39 @@ See also the bsc and libbsc web site:
 #include "../platform/platform.h"
 #include "../libbsc.h"
 
-#include "divsufsort/divsufsort.h"
+#include "libsais/libsais.h"
 
 int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * indexes, int features)
 {
-    int index = divbwt(T, T, NULL, n, num_indexes, indexes, features & LIBBSC_FEATURE_MULTITHREADING);
-    switch (index)
+    if (int * RESTRICT A = (int *)bsc_malloc(n * sizeof(int)))
     {
-        case -1 : return LIBBSC_BAD_PARAMETER;
-        case -2 : return LIBBSC_NOT_ENOUGH_MEMORY;
+        int mod = n / 8;
+        {
+            mod |= mod >> 1;  mod |= mod >> 2;
+            mod |= mod >> 4;  mod |= mod >> 8;
+            mod |= mod >> 16; mod >>= 1;
+        }
+
+#ifdef LIBBSC_OPENMP
+        int index = libsais_bwt_aux_omp(T, T, A, n, 0, mod + 1, indexes, (features & LIBBSC_FEATURE_MULTITHREADING) > 0 ? 0 : 1);
+#else
+        int index = libsais_bwt_aux(T, T, A, n, 0, mod + 1, indexes);
+#endif
+
+        bsc_free(A);
+
+        switch (index)
+        {
+            case -1 : return LIBBSC_BAD_PARAMETER;
+            case -2 : return LIBBSC_NOT_ENOUGH_MEMORY;
+        }
+
+        num_indexes[0] = (unsigned char)((n - 1) / (mod + 1));
+        index = indexes[0]; memcpy(&indexes[0], &indexes[1], num_indexes[0] * sizeof(int));
+
+        return index;
     }
-    return index;
+    return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
 static int bsc_unbwt_mergedTL_serial(unsigned char * RESTRICT T, unsigned int * RESTRICT P, int n, int index)

@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-   Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
+   Copyright (c) 2009-2021 Ilya Grebnov <ilya.grebnov@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -139,7 +139,7 @@ int bsc_coder_compress_serial(const unsigned char * input, unsigned char * outpu
             result = inputSize; memcpy(output + outputPtr, input + inputStart, inputSize);
         }
 
-#if defined(BSC_ALLOW_UNALIGNED)
+#if defined(LIBBSC_ALLOW_UNALIGNED_ACCESS)
         *(int *)(output + 1 + 8 * blockId + 0) = inputSize;
         *(int *)(output + 1 + 8 * blockId + 4) = result;
 #else

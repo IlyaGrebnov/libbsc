@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-   Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
+   Copyright (c) 2009-2021 Ilya Grebnov <ilya.grebnov@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -27,21 +27,6 @@ for full list of contributors.
 
 See also the bsc and libbsc web site:
   http://libbsc.com/ for more information.
-
---*/
-
-/*--
-
-Sort Transform is patented by Michael Schindler under US patent 6,199,064.
-However for research purposes this algorithm is included in this software.
-So if you are of the type who should worry about this (making money) worry away.
-The author shall have no liability with respect to the infringement of
-copyrights, trade secrets or any patents by this software. In no event will
-the author be liable for any lost revenue or profits or other special,
-indirect and consequential damages.
-
-Sort Transform is disabled by default and can be enabled by defining the
-preprocessor macro LIBBSC_SORT_TRANSFORM_SUPPORT at compile time.
 
 --*/
 
@@ -850,8 +835,8 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.1.0. 8 July 2012.\n");
-    fprintf(stdout, "Copyright (c) 2009-2012 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.1.1. 24 June 2021.\n");
+    fprintf(stdout, "Copyright (c) 2009-2021 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)
 

@@ -1,3 +1,7 @@
+Changes in 3.1.1 (June, 24 2021)
+- divsufsort library is replaced with libsais 2.3.0
+- back40computing library is replaced with cub from CUDA Toolkit 11.3
+
 Changes in 3.1.0 (July 8, 2012)
 - Added Kepler GPU support with CUDA Toolkit 4.2
 

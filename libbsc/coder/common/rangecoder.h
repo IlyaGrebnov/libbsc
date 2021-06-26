@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-   Copyright (c) 2009-2012 Ilya Grebnov <ilya.grebnov@gmail.com>
+   Copyright (c) 2009-2021 Ilya Grebnov <ilya.grebnov@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ private:
 
     INLINE void OutputShort(unsigned short s)
     {
-#if defined(BSC_ALLOW_UNALIGNED)
+#if defined(LIBBSC_ALLOW_UNALIGNED_ACCESS)
         *ari_output++ = s;
 #else
         memcpy(ari_output++, &s, sizeof(unsigned short));
@@ -71,7 +71,7 @@ private:
 
     INLINE unsigned short InputShort()
     {
-#if defined(BSC_ALLOW_UNALIGNED)
+#if defined(LIBBSC_ALLOW_UNALIGNED_ACCESS)
         return *ari_input++;
 #else
         unsigned short ret;
