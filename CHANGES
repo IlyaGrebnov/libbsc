@@ -1,3 +1,6 @@
+Changes in 3.1.2 (July, 14 2021)
+- Improved reverse BWT performance with libsais 2.4.0
+
 Changes in 3.1.1 (June, 24 2021)
 - divsufsort library is replaced with libsais 2.3.0
 - back40computing library is replaced with cub from CUDA Toolkit 11.3

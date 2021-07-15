@@ -165,6 +165,104 @@ extern "C" {
     int32_t libsais_bwt_aux_omp(const uint8_t * T, uint8_t * U, int32_t * A, int32_t n, int32_t fs, int32_t r, int32_t * I, int32_t threads);
 #endif
 
+    /**
+    * Creates the libsais reverse BWT context that allows reusing allocated memory with each libsais_unbwt_* operation. 
+    * In multi-threaded environments, use one context per thread for parallel executions.
+    * @return the libsais context, NULL otherwise.
+    */
+    void * libsais_unbwt_create_ctx(void);
+
+#if defined(_OPENMP)
+    /**
+    * Creates the libsais reverse BWT context that allows reusing allocated memory with each parallel libsais_unbwt_* operation using OpenMP. 
+    * In multi-threaded environments, use one context per thread for parallel executions.
+    * @param threads The number of OpenMP threads to use (can be 0 for OpenMP default).
+    * @return the libsais context, NULL otherwise.
+    */
+    void * libsais_unbwt_create_ctx_omp(int32_t threads);
+#endif
+
+    /**
+    * Destroys the libsass reverse BWT context and free previusly allocated memory.
+    * @param ctx The libsais context (can be NULL).
+    */
+    void libsais_unbwt_free_ctx(void * ctx);
+
+    /**
+    * Constructs the original string from a given burrows-wheeler transformed string with primary index.
+    * @param T [0..n-1] The input string.
+    * @param U [0..n-1] The output string (can be T).
+    * @param A [0..n] The temporary array (NOTE, temporary array must be n + 1 size).
+    * @param n The length of the given string.
+    * @param i The primary index.
+    * @return 0 if no error occurred, -1 or -2 otherwise.
+    */
+    int32_t libsais_unbwt(const uint8_t * T, uint8_t * U, int32_t * A, int32_t n, int32_t i);
+
+    /**
+    * Constructs the original string from a given burrows-wheeler transformed string with primary index using libsais reverse BWT context.
+    * @param ctx The libsais reverse BWT context.
+    * @param T [0..n-1] The input string.
+    * @param U [0..n-1] The output string (can be T).
+    * @param A [0..n] The temporary array (NOTE, temporary array must be n + 1 size).
+    * @param n The length of the given string.
+    * @param i The primary index.
+    * @return 0 if no error occurred, -1 or -2 otherwise.
+    */
+    int32_t libsais_unbwt_ctx(const void * ctx, const uint8_t * T, uint8_t * U, int32_t * A, int32_t n, int32_t i);
+
+    /**
+    * Constructs the original string from a given burrows-wheeler transformed string with auxiliary indexes.
+    * @param T [0..n-1] The input string.
+    * @param U [0..n-1] The output string (can be T).
+    * @param A [0..n] The temporary array (NOTE, temporary array must be n + 1 size).
+    * @param n The length of the given string.
+    * @param r The sampling rate for auxiliary indexes (must be power of 2).
+    * @param I [0..(n-1)/r] The input auxiliary indexes.
+    * @return 0 if no error occurred, -1 or -2 otherwise.
+    */
+    int32_t libsais_unbwt_aux(const uint8_t * T, uint8_t * U, int32_t * A, int32_t n, int32_t r, const int32_t * I);
+
+    /**
+    * Constructs the original string from a given burrows-wheeler transformed string with auxiliary indexes using libsais reverse BWT context.
+    * @param ctx The libsais reverse BWT context.
+    * @param T [0..n-1] The input string.
+    * @param U [0..n-1] The output string (can be T).
+    * @param A [0..n] The temporary array (NOTE, temporary array must be n + 1 size).
+    * @param n The length of the given string.
+    * @param r The sampling rate for auxiliary indexes (must be power of 2).
+    * @param I [0..(n-1)/r] The input auxiliary indexes.
+    * @return 0 if no error occurred, -1 or -2 otherwise.
+    */
+    int32_t libsais_unbwt_aux_ctx(const void * ctx, const uint8_t * T, uint8_t * U, int32_t * A, int32_t n, int32_t r, const int32_t * I);
+
+#if defined(_OPENMP)
+    /**
+    * Constructs the original string from a given burrows-wheeler transformed string with primary index in parallel using OpenMP.
+    * @param T [0..n-1] The input string.
+    * @param U [0..n-1] The output string (can be T).
+    * @param A [0..n] The temporary array (NOTE, temporary array must be n + 1 size).
+    * @param n The length of the given string.
+    * @param i The primary index.
+    * @param threads The number of OpenMP threads to use (can be 0 for OpenMP default).
+    * @return 0 if no error occurred, -1 or -2 otherwise.
+    */
+    int32_t libsais_unbwt_omp(const uint8_t * T, uint8_t * U, int32_t * A, int32_t n, int32_t i, int32_t threads);
+
+    /**
+    * Constructs the original string from a given burrows-wheeler transformed string with auxiliary indexes in parallel using OpenMP.
+    * @param T [0..n-1] The input string.
+    * @param U [0..n-1] The output string (can be T).
+    * @param A [0..n] The temporary array (NOTE, temporary array must be n + 1 size).
+    * @param n The length of the given string.
+    * @param r The sampling rate for auxiliary indexes (must be power of 2).
+    * @param I [0..(n-1)/r] The input auxiliary indexes.
+    * @param threads The number of OpenMP threads to use (can be 0 for OpenMP default).
+    * @return 0 if no error occurred, -1 or -2 otherwise.
+    */
+    int32_t libsais_unbwt_aux_omp(const uint8_t * T, uint8_t * U, int32_t * A, int32_t n, int32_t r, const int32_t * I, int32_t threads);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
