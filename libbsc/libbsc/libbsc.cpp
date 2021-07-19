@@ -119,7 +119,7 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
         mode += (lzpMinLen << 8);
         mode += (lzpHashSize << 16);
     }
-    if (n < 0 || n > 1073741824) return LIBBSC_BAD_PARAMETER;
+    if (n < 0 || n > 2146435072) return LIBBSC_BAD_PARAMETER;
     if (n <= LIBBSC_HEADER_SIZE)
     {
         return bsc_store(data, data, n, features);

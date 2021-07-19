@@ -49,6 +49,55 @@ int bsc_qlfc_init(int features)
     return bsc_qlfc_init_static_model();
 }
 
+#if (defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)) && (defined(__clang__) || defined(_MSC_VER))
+
+unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
+{
+#if defined(_MSC_VER)
+    __declspec(align(32)) 
+#endif
+    signed char ranks[ALPHABET_SIZE];
+
+#if defined(_MSC_VER)
+    __declspec(align(32))
+#endif
+    signed char flags[ALPHABET_SIZE];
+
+    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { ranks[i] = i - 128; }
+    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { flags[i] = 0; }
+
+    ptrdiff_t index = n; signed char nSymbols = -128;
+    for (ptrdiff_t i = (ptrdiff_t)n - 1; i >= 0;)
+    {
+        unsigned char currentChar = input[i--];
+        for (; (i >= 0) && (input[i] == currentChar); --i);
+
+        signed char rank = ranks[currentChar];
+        for (int t = 0 * 32; t < 1 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
+        for (int t = 1 * 32; t < 2 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
+        for (int t = 2 * 32; t < 3 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
+        for (int t = 3 * 32; t < 4 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
+        for (int t = 4 * 32; t < 5 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
+        for (int t = 5 * 32; t < 6 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
+        for (int t = 6 * 32; t < 7 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
+        for (int t = 7 * 32; t < 8 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
+        ranks[currentChar] = -128;
+
+        if (flags[currentChar] == 0) { flags[currentChar] = 1; rank = nSymbols++; }
+
+        buffer[--index] = rank + 128;
+    }
+
+    buffer[n - 1] = 1;
+
+    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { MTFTable[ranks[i] + 128] = i; }
+    for (ptrdiff_t i = 1; i < ALPHABET_SIZE; ++i) { if (flags[MTFTable[i]] == 0) { MTFTable[i] = MTFTable[i - 1]; break; } }
+
+    return buffer + index;
+}
+
+#else
+
 unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
 {
     unsigned char Flag[ALPHABET_SIZE];
@@ -107,6 +156,8 @@ unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigne
 
     return buffer + index;
 }
+
+#endif
 
 int bsc_qlfc_adaptive_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model)
 {

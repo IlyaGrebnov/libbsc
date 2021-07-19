@@ -1,3 +1,7 @@
+Changes in 3.1.3 (July, 14 2021)
+- Maximum compression block size increased to 2047 megabytes
+- Improved forward MTF performance with SIMD (SSE2)
+
 Changes in 3.1.2 (July, 14 2021)
 - Improved reverse BWT performance with libsais 2.4.0
 

@@ -670,7 +670,7 @@ void ShowUsage(void)
 
     fprintf(stdout, "Block sorting options:\n");
     fprintf(stdout, "  -b<size> Block size in megabytes, default: -b25\n");
-    fprintf(stdout, "             minimum: -b1, maximum: -b1024\n");
+    fprintf(stdout, "             minimum: -b1, maximum: -b2047\n");
     fprintf(stdout, "  -m<algo> Block sorting algorithm, default: -m0\n");
     fprintf(stdout, "             -m0 Burrows Wheeler Transform (default)\n");
 #ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
@@ -725,7 +725,7 @@ void ProcessSwitch(char * s)
             {
                 char * strNum = s; while ((*s >= '0') && (*s <= '9')) s++;
                 paramBlockSize = atoi(strNum) * 1024 * 1024;
-                if ((paramBlockSize < 1024 * 1024) || (paramBlockSize > 1024 * 1024 * 1024)) ShowUsage();
+                if ((paramBlockSize < 1024 * 1024) || (paramBlockSize > 2047 * 1024 * 1024)) ShowUsage();
                 break;
             }
 
@@ -835,7 +835,7 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.1.2. 14 July 2021.\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.1.3. 18 July 2021.\n");
     fprintf(stdout, "Copyright (c) 2009-2021 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)
