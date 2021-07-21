@@ -63,7 +63,7 @@ unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigne
 #endif
     signed char flags[ALPHABET_SIZE];
 
-    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { ranks[i] = i - 128; }
+    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { ranks[i] = (signed char)(i - 128); }
     for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { flags[i] = 0; }
 
     ptrdiff_t index = n; signed char nSymbols = -128;
@@ -90,7 +90,7 @@ unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigne
 
     buffer[n - 1] = 1;
 
-    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { MTFTable[ranks[i] + 128] = i; }
+    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { MTFTable[ranks[i] + 128] = (unsigned char)i; }
     for (ptrdiff_t i = 1; i < ALPHABET_SIZE; ++i) { if (flags[MTFTable[i]] == 0) { MTFTable[i] = MTFTable[i - 1]; break; } }
 
     return buffer + index;
