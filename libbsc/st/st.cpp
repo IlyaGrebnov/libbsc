@@ -244,7 +244,7 @@ static int bsc_st3_transform_parallel(unsigned char * RESTRICT T, unsigned short
 
     if (int * RESTRICT bucket1 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
-        int pos, index;
+        int pos, index = 0;
 
         for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
@@ -387,7 +387,7 @@ static int bsc_st4_transform_parallel(unsigned char * RESTRICT T, unsigned int *
     {
         if (int * RESTRICT bucket1 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
-            int pos, index;
+            int pos, index = 0;
 
             for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
@@ -532,7 +532,7 @@ static int bsc_st5_transform_parallel(unsigned char * RESTRICT T, unsigned int *
 {
     if (int * RESTRICT bucket1 = (int *)bsc_zero_malloc(ALPHABET_SQRT_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
     {
-        int pos, index;
+        int pos, index = 0;
 
         for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
@@ -710,7 +710,7 @@ static int bsc_st6_transform_parallel(unsigned char * RESTRICT T, unsigned int *
     {
         if (int * RESTRICT bucket1 = (int *)bsc_zero_malloc(ALPHABET_SIZE * ALPHABET_SIZE * ALPHABET_SIZE * sizeof(int)))
         {
-            int pos, index;
+            int pos, index = 0;
 
             for (int i = 0; i < LIBBSC_HEADER_SIZE; ++i) T[n + i] = T[i];
 
@@ -1169,7 +1169,7 @@ static void bsc_unst_reconstruct_case2_serial(unsigned char * RESTRICT T, unsign
 
 static INLINE int bsc_unst_search(int index, unsigned int * p, unsigned int v)
 {
-    while (p[index] <= v) index++; return index;
+    while (p[index] <= v) { index++; } return index;
 }
 
 #define ST_NUM_FASTBITS (10)

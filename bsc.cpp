@@ -556,7 +556,7 @@ void Decompression(char * argv[])
                         if (blockSize > bufferSize) bufferSize = blockSize;
                         if (dataSize  > bufferSize) bufferSize = dataSize;
 
-                        if (buffer != NULL) bsc_free(buffer); buffer = (unsigned char *)bsc_malloc(bufferSize);
+                        if (buffer != NULL) { bsc_free(buffer); } buffer = (unsigned char *)bsc_malloc(bufferSize);
                     }
 
                     if (buffer == NULL)
