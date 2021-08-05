@@ -1,3 +1,7 @@
+Changes in 3.1.4 (August, 4 2021)
+- Implemented dynamic CPU Dispatching to SSE2, AVX and AVX2.
+- Farther improved forward MTF performance.
+
 Changes in 3.1.3 (July, 14 2021)
 - Maximum compression block size increased to 2047 megabytes
 - Improved forward MTF performance with SIMD (SSE2)

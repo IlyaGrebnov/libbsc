@@ -45,14 +45,37 @@ See also the bsc and libbsc web site:
 
 #include "qlfc_model.h"
 
-int bsc_qlfc_init(int features)
-{
-    return bsc_qlfc_init_static_model();
-}
+#if (LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE2)
 
-#if (defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)) && (defined(__clang__) || defined(_MSC_VER))
+    #if defined(LIBBSC_DYNAMIC_CPU_DISPATCH)
+        unsigned char * bsc_qlfc_transform_avx2(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
+        unsigned char * bsc_qlfc_transform_avx(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
+        unsigned char * bsc_qlfc_transform_sse2(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
 
-unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
+        #if LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
+            unsigned char * bsc_qlfc_transform(const unsigned char * input, unsigned char * buffer, int n, unsigned char * MTFTable)
+            {
+                if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX2) { return bsc_qlfc_transform_avx2(input, buffer, n, MTFTable); }
+                if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX)  { return bsc_qlfc_transform_avx (input, buffer, n, MTFTable); }
+
+                return bsc_qlfc_transform_sse2(input, buffer, n, MTFTable);
+            }
+        #endif
+
+        #if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_AVX2
+            #define QLFC_TRANSFORM_FUNCTION_NAME bsc_qlfc_transform_avx2
+        #elif LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_AVX
+            #define QLFC_TRANSFORM_FUNCTION_NAME bsc_qlfc_transform_avx
+        #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
+            #define QLFC_TRANSFORM_FUNCTION_NAME bsc_qlfc_transform_sse2
+        #else
+            #error Unsupported instruction set
+        #endif
+    #else
+        #define QLFC_TRANSFORM_FUNCTION_NAME bsc_qlfc_transform
+    #endif
+
+unsigned char * QLFC_TRANSFORM_FUNCTION_NAME (const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
 {
 #if defined(_MSC_VER)
     __declspec(align(32)) 
@@ -67,13 +90,36 @@ unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigne
     for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { ranks[i] = (signed char)(i - 128); }
     for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { flags[i] = 0; }
 
-    ptrdiff_t index = n; signed char nSymbols = -128;
-    for (ptrdiff_t i = (ptrdiff_t)n - 1; i >= 0;)
-    {
-        unsigned char currentChar = input[i--];
-        for (; (i >= 0) && (input[i] == currentChar); --i);
+    ptrdiff_t i = (ptrdiff_t)n - 1, j = n; signed char nSymbols = 0;
 
-        signed char rank = ranks[currentChar];
+    for (; i >= 0;)
+    {
+        unsigned char currentChar1 = input[i]; do {} while ((--i >= 0) && (input[i] == currentChar1)); if (i < 0) { i = 0; break; }
+        unsigned char currentChar2 = input[i]; do {} while ((--i >= 0) && (input[i] == currentChar2));
+
+        signed char rank1 = ranks[currentChar1], rank2 = ranks[currentChar2]; rank2 += rank1 > rank2;
+
+        buffer[--j] = rank1 + 128; if (flags[currentChar1] == 0) { flags[currentChar1] = 1; buffer[j] = nSymbols++; }
+        buffer[--j] = rank2 + 128; if (flags[currentChar2] == 0) { flags[currentChar2] = 1; buffer[j] = nSymbols++; }
+
+        for (int t = 0 * 32; t < 1 * 32; ++t) { ranks[t] -= (rank1 > ranks[t] ? (signed char)-1 : (signed char)0) + (rank2 > ranks[t] ? (signed char)-1 : (signed char)0); }
+        for (int t = 1 * 32; t < 2 * 32; ++t) { ranks[t] -= (rank1 > ranks[t] ? (signed char)-1 : (signed char)0) + (rank2 > ranks[t] ? (signed char)-1 : (signed char)0); }
+        for (int t = 2 * 32; t < 3 * 32; ++t) { ranks[t] -= (rank1 > ranks[t] ? (signed char)-1 : (signed char)0) + (rank2 > ranks[t] ? (signed char)-1 : (signed char)0); }
+        for (int t = 3 * 32; t < 4 * 32; ++t) { ranks[t] -= (rank1 > ranks[t] ? (signed char)-1 : (signed char)0) + (rank2 > ranks[t] ? (signed char)-1 : (signed char)0); }
+        for (int t = 4 * 32; t < 5 * 32; ++t) { ranks[t] -= (rank1 > ranks[t] ? (signed char)-1 : (signed char)0) + (rank2 > ranks[t] ? (signed char)-1 : (signed char)0); }
+        for (int t = 5 * 32; t < 6 * 32; ++t) { ranks[t] -= (rank1 > ranks[t] ? (signed char)-1 : (signed char)0) + (rank2 > ranks[t] ? (signed char)-1 : (signed char)0); }
+        for (int t = 6 * 32; t < 7 * 32; ++t) { ranks[t] -= (rank1 > ranks[t] ? (signed char)-1 : (signed char)0) + (rank2 > ranks[t] ? (signed char)-1 : (signed char)0); }
+        for (int t = 7 * 32; t < 8 * 32; ++t) { ranks[t] -= (rank1 > ranks[t] ? (signed char)-1 : (signed char)0) + (rank2 > ranks[t] ? (signed char)-1 : (signed char)0); }
+        
+        ranks[currentChar1] = -127; ranks[currentChar2] = -128;
+    }
+
+    if (i >= 0)
+    {
+        unsigned char currentChar = input[0]; signed char rank = ranks[currentChar];
+
+        buffer[--j] = rank + 128; if (flags[currentChar] == 0) { flags[currentChar] = 1; buffer[j] = nSymbols++; }
+
         for (int t = 0 * 32; t < 1 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
         for (int t = 1 * 32; t < 2 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
         for (int t = 2 * 32; t < 3 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
@@ -83,10 +129,6 @@ unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigne
         for (int t = 6 * 32; t < 7 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
         for (int t = 7 * 32; t < 8 * 32; ++t) { ranks[t] -= (ranks[t] < rank ? -1 : 0); }
         ranks[currentChar] = -128;
-
-        if (flags[currentChar] == 0) { flags[currentChar] = 1; rank = nSymbols++; }
-
-        buffer[--index] = rank + 128;
     }
 
     buffer[n - 1] = 1;
@@ -94,7 +136,7 @@ unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigne
     for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { MTFTable[ranks[i] + 128] = (unsigned char)i; }
     for (ptrdiff_t i = 1; i < ALPHABET_SIZE; ++i) { if (flags[MTFTable[i]] == 0) { MTFTable[i] = MTFTable[i - 1]; break; } }
 
-    return buffer + index;
+    return buffer + j;
 }
 
 #else
@@ -159,6 +201,13 @@ unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigne
 }
 
 #endif
+
+#if !defined(LIBBSC_DYNAMIC_CPU_DISPATCH) || LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
+
+int bsc_qlfc_init(int features)
+{
+    return bsc_qlfc_init_static_model();
+}
 
 int bsc_qlfc_adaptive_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model)
 {
@@ -1407,6 +1456,8 @@ int bsc_qlfc_adaptive_decode_block(const unsigned char * input, unsigned char * 
     };
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
+
+#endif
 
 /*-----------------------------------------------------------*/
 /* End                                              qlfc.cpp */

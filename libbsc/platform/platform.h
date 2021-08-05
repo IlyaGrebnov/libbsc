@@ -60,6 +60,45 @@ See also the bsc and libbsc web site:
 
 #define ALPHABET_SIZE (256)
 
+#define LIBBSC_CPU_FEATURE_NONE      0
+#define LIBBSC_CPU_FEATURE_SSE2      2
+#define LIBBSC_CPU_FEATURE_SSE3      3
+#define LIBBSC_CPU_FEATURE_SSSE3     4
+#define LIBBSC_CPU_FEATURE_SSE41     5
+#define LIBBSC_CPU_FEATURE_SSE42     6
+#define LIBBSC_CPU_FEATURE_AVX       7
+#define LIBBSC_CPU_FEATURE_AVX2      8
+#define LIBBSC_CPU_FEATURE_AVX512F   9
+#define LIBBSC_CPU_FEATURE_AVX512BW  10
+
+#if (defined(_M_AMD64) || defined(_M_X64) || defined(__amd64)) && !defined(__x86_64__)
+    #define __x86_64__ 1
+#endif
+
+#ifndef LIBBSC_CPU_FEATURE
+    #if defined (__AVX512VL__) && defined (__AVX512BW__) && defined (__AVX512DQ__)
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_AVX512BW
+    #elif defined (__AVX512F__) || defined (__AVX512__)
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_AVX512F
+    #elif defined (__AVX2__)
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_AVX2
+    #elif defined (__AVX__)
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_AVX
+    #elif defined (__SSE4_2__)
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_SSE42
+    #elif defined (__SSE4_1__)
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_SSE41
+    #elif defined (__SSSE3__)
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_SSSE3
+    #elif defined (__SSE3__)
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_SSE3
+    #elif defined (__SSE2__) || defined (__x86_64__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_SSE2
+    #else
+        #define LIBBSC_CPU_FEATURE LIBBSC_CPU_FEATURE_NONE
+    #endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -93,6 +132,12 @@ extern "C" {
     * @param address    - previously allocated memory block to be freed.
     */
     void bsc_free(void * address);
+
+    /**
+    * Detects supported CPU features (Streaming SIMD Extensions).
+    * @return highest supported CPU feature.
+    */
+    int bsc_get_cpu_features(void);
 
 #ifdef __cplusplus
 }
