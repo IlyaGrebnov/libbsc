@@ -38,6 +38,12 @@ See also the bsc and libbsc web site:
     #define LIBBSC_OPENMP
 #endif
 
+#if defined(_MSC_VER)
+    #include <intrin.h>
+#else
+    #include <immintrin.h>
+#endif
+
 #if defined(__GNUC__)
     #define INLINE __inline__
 #elif defined(_MSC_VER)
@@ -48,6 +54,12 @@ See also the bsc and libbsc web site:
     #define INLINE inline
 #else
     #define INLINE /* */
+#endif
+
+#if defined(_MSC_VER)
+    #define ALIGNED(x) __declspec(align(x))
+#elif defined(__GNUC__)
+    #define ALIGNED(x) __attribute__ ((aligned(x)))
 #endif
 
 #if defined(__GNUC__) || defined(__clang__) || defined(__CUDACC__)

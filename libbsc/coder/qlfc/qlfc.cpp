@@ -45,47 +45,73 @@ See also the bsc and libbsc web site:
 
 #include "qlfc_model.h"
 
-#if (LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE2)
+#if defined(LIBBSC_DYNAMIC_CPU_DISPATCH)
+    unsigned char * bsc_qlfc_transform_avx2(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
+    unsigned char * bsc_qlfc_transform_avx(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
+    unsigned char * bsc_qlfc_transform_sse2(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
 
-    #if defined(LIBBSC_DYNAMIC_CPU_DISPATCH)
-        unsigned char * bsc_qlfc_transform_avx2(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
-        unsigned char * bsc_qlfc_transform_avx(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
-        unsigned char * bsc_qlfc_transform_sse2(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
+    int bsc_qlfc_adaptive_decode_avx(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
+    int bsc_qlfc_adaptive_decode_sse41(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
+    int bsc_qlfc_adaptive_decode_sse2(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
 
-        #if LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
-            unsigned char * bsc_qlfc_transform(const unsigned char * input, unsigned char * buffer, int n, unsigned char * MTFTable)
-            {
-                if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX2) { return bsc_qlfc_transform_avx2(input, buffer, n, MTFTable); }
-                if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX)  { return bsc_qlfc_transform_avx (input, buffer, n, MTFTable); }
+    int bsc_qlfc_static_decode_avx(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
+    int bsc_qlfc_static_decode_sse41(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
+    int bsc_qlfc_static_decode_sse2(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
 
-                return bsc_qlfc_transform_sse2(input, buffer, n, MTFTable);
-            }
-        #endif
+    #if LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
+        unsigned char * bsc_qlfc_transform(const unsigned char * input, unsigned char * buffer, int n, unsigned char * MTFTable)
+        {
+            if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX2) { return bsc_qlfc_transform_avx2(input, buffer, n, MTFTable); }
+            if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX)  { return bsc_qlfc_transform_avx (input, buffer, n, MTFTable); }
 
-        #if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_AVX2
-            #define QLFC_TRANSFORM_FUNCTION_NAME bsc_qlfc_transform_avx2
-        #elif LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_AVX
-            #define QLFC_TRANSFORM_FUNCTION_NAME bsc_qlfc_transform_avx
-        #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
-            #define QLFC_TRANSFORM_FUNCTION_NAME bsc_qlfc_transform_sse2
-        #else
-            #error Unsupported instruction set
-        #endif
-    #else
-        #define QLFC_TRANSFORM_FUNCTION_NAME bsc_qlfc_transform
+            return bsc_qlfc_transform_sse2(input, buffer, n, MTFTable);
+        }
+
+        int bsc_qlfc_adaptive_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
+        {
+            if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX)   { return bsc_qlfc_adaptive_decode_avx  (input, output, model); }
+            if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_SSE41) { return bsc_qlfc_adaptive_decode_sse41(input, output, model); }
+
+            return bsc_qlfc_adaptive_decode_sse2(input, output, model);
+        }
+
+        int bsc_qlfc_static_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
+        {
+            if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX)   { return bsc_qlfc_static_decode_avx  (input, output, model); }
+            if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_SSE41) { return bsc_qlfc_static_decode_sse41(input, output, model); }
+
+            return bsc_qlfc_static_decode_sse2(input, output, model);
+        }
     #endif
+
+    #if LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_AVX2
+        #define QLFC_TRANSFORM_FUNCTION_NAME       bsc_qlfc_transform_avx2
+    #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_AVX
+        #define QLFC_TRANSFORM_FUNCTION_NAME       bsc_qlfc_transform_avx
+        #define QLFC_ADAPTIVE_DECODE_FUNCTION_NAME bsc_qlfc_adaptive_decode_avx
+        #define QLFC_STATIC_DECODE_FUNCTION_NAME   bsc_qlfc_static_decode_avx
+    #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE41
+        #define QLFC_ADAPTIVE_DECODE_FUNCTION_NAME bsc_qlfc_adaptive_decode_sse41
+        #define QLFC_STATIC_DECODE_FUNCTION_NAME   bsc_qlfc_static_decode_sse41
+    #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
+        #define QLFC_ADAPTIVE_DECODE_FUNCTION_NAME bsc_qlfc_adaptive_decode_sse2
+        #define QLFC_STATIC_DECODE_FUNCTION_NAME   bsc_qlfc_static_decode_sse2
+        #define QLFC_TRANSFORM_FUNCTION_NAME       bsc_qlfc_transform_sse2
+    #endif
+#else
+    #define QLFC_TRANSFORM_FUNCTION_NAME       bsc_qlfc_transform
+    #define QLFC_ADAPTIVE_DECODE_FUNCTION_NAME bsc_qlfc_adaptive_decode
+    #define QLFC_STATIC_DECODE_FUNCTION_NAME   bsc_qlfc_static_decode
+#endif
+
+#if defined(QLFC_TRANSFORM_FUNCTION_NAME)
+
+#if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE2
 
 unsigned char * QLFC_TRANSFORM_FUNCTION_NAME (const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
 {
-#if defined(_MSC_VER)
-    __declspec(align(32)) 
-#endif
-    signed char ranks[ALPHABET_SIZE];
-
-#if defined(_MSC_VER)
-    __declspec(align(32))
-#endif
-    signed char flags[ALPHABET_SIZE];
+    signed char ALIGNED(32) ranks[ALPHABET_SIZE];
+    signed char ALIGNED(32) flags[ALPHABET_SIZE];
 
     for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { ranks[i] = (signed char)(i - 128); }
     for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { flags[i] = 0; }
@@ -141,7 +167,7 @@ unsigned char * QLFC_TRANSFORM_FUNCTION_NAME (const unsigned char * RESTRICT inp
 
 #else
 
-unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
+unsigned char * QLFC_TRANSFORM_FUNCTION_NAME (const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
 {
     unsigned char Flag[ALPHABET_SIZE];
 
@@ -199,6 +225,8 @@ unsigned char * bsc_qlfc_transform(const unsigned char * RESTRICT input, unsigne
 
     return buffer + index;
 }
+
+#endif
 
 #endif
 
@@ -852,11 +880,39 @@ int bsc_qlfc_static_encode(const unsigned char * input, unsigned char * output, 
     return coder.FinishEncoder();
 }
 
-int bsc_qlfc_adaptive_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
+#endif
+
+#if (defined(QLFC_ADAPTIVE_DECODE_FUNCTION_NAME) || defined(QLFC_STATIC_DECODE_FUNCTION_NAME)) && (LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE41)
+
+static const __m128i ALIGNED(16) rank16_shuffle[16] =
+{
+    _mm_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 0, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 0, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 7, 0, 8, 9, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 7, 8, 0, 9, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 10, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 11, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 12, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 13, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0, 14, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0, 15),
+    _mm_setr_epi8(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0),
+};
+
+#endif
+
+#if defined(QLFC_ADAPTIVE_DECODE_FUNCTION_NAME)
+
+int QLFC_ADAPTIVE_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
 {
     RangeCoder coder;
 
-    unsigned char MTFTable[ALPHABET_SIZE];
+    unsigned char ALIGNED(16) MTFTable[ALPHABET_SIZE];
 
     bsc_qlfc_init_model(model);
 
@@ -1039,11 +1095,21 @@ int bsc_qlfc_adaptive_decode(const unsigned char * input, unsigned char * output
         }
 
         {
+#if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE41
+            __m128i * MTFTable_p = (__m128i *)&MTFTable[rank & (-16)];
+            __m128i r = _mm_load_si128(MTFTable_p); _mm_store_si128(MTFTable_p, _mm_shuffle_epi8(_mm_insert_epi8(r, currentChar, 0), rank16_shuffle[rank & 15]));
+
+            while ((--MTFTable_p) >= (__m128i *)MTFTable)
+            {
+                __m128i t = _mm_load_si128(MTFTable_p); _mm_store_si128(MTFTable_p, _mm_alignr_epi8(r, t, 1)); r = t;
+            }
+#else
             for (int r = 0; r < rank; ++r)
             {
                 MTFTable[r] = MTFTable[r + 1];
             }
             MTFTable[rank] = currentChar;
+#endif
         }
 
         avgRank         =   (avgRank * 124 + rank * 4) >> 7;
@@ -1136,11 +1202,15 @@ int bsc_qlfc_adaptive_decode(const unsigned char * input, unsigned char * output
     return n;
 }
 
-int bsc_qlfc_static_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
+#endif
+
+#if defined(QLFC_STATIC_DECODE_FUNCTION_NAME)
+
+int QLFC_STATIC_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
 {
     RangeCoder coder;
 
-    unsigned char MTFTable[ALPHABET_SIZE];
+    unsigned char ALIGNED(16) MTFTable[ALPHABET_SIZE];
 
     bsc_qlfc_init_model(model);
 
@@ -1309,11 +1379,21 @@ int bsc_qlfc_static_decode(const unsigned char * input, unsigned char * output, 
         }
 
         {
+#if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE41
+            __m128i * MTFTable_p = (__m128i *)&MTFTable[rank & (-16)];
+            __m128i r = _mm_load_si128(MTFTable_p); _mm_store_si128(MTFTable_p, _mm_shuffle_epi8(_mm_insert_epi8(r, currentChar, 0), rank16_shuffle[rank & 15]));
+
+            while ((--MTFTable_p) >= (__m128i *)MTFTable)
+            {
+                __m128i t = _mm_load_si128(MTFTable_p); _mm_store_si128(MTFTable_p, _mm_alignr_epi8(r, t, 1)); r = t;
+            }
+#else
             for (int r = 0; r < rank; ++r)
             {
                 MTFTable[r] = MTFTable[r + 1];
             }
             MTFTable[rank] = currentChar;
+#endif
         }
 
         avgRank         =   (avgRank * 124 + rank * 4) >> 7;
@@ -1396,6 +1476,10 @@ int bsc_qlfc_static_decode(const unsigned char * input, unsigned char * output, 
 
     return n;
 }
+
+#endif
+
+#if !defined(LIBBSC_DYNAMIC_CPU_DISPATCH) || LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
 
 int bsc_qlfc_static_encode_block(const unsigned char * input, unsigned char * output, int inputSize, int outputSize)
 {
