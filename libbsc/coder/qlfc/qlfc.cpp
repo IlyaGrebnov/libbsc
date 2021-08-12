@@ -110,8 +110,8 @@ See also the bsc and libbsc web site:
 
 unsigned char * QLFC_TRANSFORM_FUNCTION_NAME (const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
 {
-    signed char ALIGNED(32) ranks[ALPHABET_SIZE];
-    signed char ALIGNED(32) flags[ALPHABET_SIZE];
+    signed char ALIGNED(64) ranks[ALPHABET_SIZE];
+    signed char ALIGNED(64) flags[ALPHABET_SIZE];
 
     for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { ranks[i] = (signed char)(i - 128); }
     for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { flags[i] = 0; }
@@ -884,7 +884,7 @@ int bsc_qlfc_static_encode(const unsigned char * input, unsigned char * output, 
 
 #if (defined(QLFC_ADAPTIVE_DECODE_FUNCTION_NAME) || defined(QLFC_STATIC_DECODE_FUNCTION_NAME)) && (LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE41)
 
-static const __m128i ALIGNED(16) rank16_shuffle[16] =
+static const __m128i ALIGNED(64) rank16_shuffle[16] =
 {
     _mm_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
     _mm_setr_epi8(1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
@@ -912,7 +912,7 @@ int QLFC_ADAPTIVE_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned ch
 {
     RangeCoder coder;
 
-    unsigned char ALIGNED(16) MTFTable[ALPHABET_SIZE];
+    unsigned char ALIGNED(64) MTFTable[ALPHABET_SIZE];
 
     bsc_qlfc_init_model(model);
 
@@ -1210,7 +1210,7 @@ int QLFC_STATIC_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char
 {
     RangeCoder coder;
 
-    unsigned char ALIGNED(16) MTFTable[ALPHABET_SIZE];
+    unsigned char ALIGNED(64) MTFTable[ALPHABET_SIZE];
 
     bsc_qlfc_init_model(model);
 

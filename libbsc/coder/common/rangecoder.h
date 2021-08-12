@@ -171,22 +171,18 @@ public:
 
     INLINE int DecodeBit(int probability)
     {
-        unsigned int range = (ari_range >> 12) * probability;
-        if (ari_code >= range)
-        {
-            ari_code -= range; ari_range -= range;
-            if (ari_range < 0x10000)
-            {
-                ari_range <<= 16; ari_code = (ari_code << 16) | InputShort();
-            }
-            return 1;
-        }
-        ari_range = range;
         if (ari_range < 0x10000)
         {
             ari_range <<= 16; ari_code = (ari_code << 16) | InputShort();
         }
-        return 0;
+
+        unsigned int range = (ari_range >> 12) * probability;
+        int bit = ari_code >= range;
+
+        ari_range = bit ? ari_range - range : range;
+        ari_code  = bit ? ari_code  - range : ari_code;
+
+        return bit;
     }
 
     INLINE unsigned int DecodeBit()
