@@ -57,6 +57,14 @@ See also the bsc and libbsc web site:
 #endif
 
 #if defined(_MSC_VER)
+    #define NOINLINE __declspec(noinline)
+#elif defined(__GNUC__)
+    #define NOINLINE __attribute__ ((noinline))
+#else
+    #define NOINLINE /* */
+#endif
+
+#if defined(_MSC_VER)
     #define ALIGNED(x) __declspec(align(x))
 #elif defined(__GNUC__)
     #define ALIGNED(x) __attribute__ ((aligned(x)))

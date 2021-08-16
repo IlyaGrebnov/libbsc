@@ -1,5 +1,8 @@
+Changes in 3.1.7 (August, 15 2021)
+- Slightly improved compression performance.
+
 Changes in 3.1.6 (August, 12 2021)
-- Improved slightly decompression performance.
+- Slightly improved decompression performance.
 
 Changes in 3.1.5 (August, 10 2021)
 - Improved Adler-32 performance with SIMD (SSSE3).

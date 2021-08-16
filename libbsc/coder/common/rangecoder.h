@@ -80,7 +80,7 @@ private:
 #endif
     };
 
-    INLINE void ShiftLow()
+    NOINLINE unsigned int ShiftLow()
     {
         if (ari.u.low32 < 0xffff0000U || ari.u.carry)
         {
@@ -93,6 +93,8 @@ private:
             ari_cache = ari.u.low32 >> 16; ari.u.carry = 0;
         } else ari_ffnum++;
         ari.u.low32 <<= 16;
+
+        return ari_range << 16;
     }
 
 public:
@@ -115,27 +117,34 @@ public:
 
     INLINE int FinishEncoder()
     {
+        if (ari_range < 0x10000)
+        {
+            ShiftLow();
+        }
+
         ShiftLow(); ShiftLow(); ShiftLow();
         return (int)(ari_output - ari_outputStart) * sizeof(ari_output[0]);
     }
 
     INLINE void EncodeBit0(int probability)
     {
-        ari_range = (ari_range >> 12) * probability;
         if (ari_range < 0x10000)
         {
-            ari_range <<= 16; ShiftLow();
+            ari_range = ShiftLow();
         }
+
+        ari_range = (ari_range >> 12) * probability;
     }
 
     INLINE void EncodeBit1(int probability)
     {
-        unsigned int range = (ari_range >> 12) * probability;
-        ari.low += range; ari_range -= range;
         if (ari_range < 0x10000)
         {
-            ari_range <<= 16; ShiftLow();
+            ari_range = ShiftLow();
         }
+
+        unsigned int range = (ari_range >> 12) * probability;
+        ari.low += range; ari_range -= range;
     }
 
     INLINE void EncodeBit(unsigned int bit)
@@ -209,7 +218,6 @@ public:
         }
         return word;
     }
-
 };
 
 #endif
