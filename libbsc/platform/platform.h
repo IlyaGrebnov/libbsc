@@ -78,6 +78,28 @@ See also the bsc and libbsc web site:
     #define RESTRICT /* */
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+    #define bsc_bit_scan_reverse(x) (__builtin_clz(x) ^ 31)
+    #define bsc_bit_scan_forward(x) (__builtin_ctz(x))
+#elif defined(_MSC_VER)
+    #pragma intrinsic(_BitScanReverse)
+    #pragma intrinsic(_BitScanForward)
+
+    static inline __forceinline unsigned long bsc_bit_scan_reverse(unsigned long x) 
+    {
+       unsigned long index;
+       _BitScanReverse(&index, x);
+       return index;
+    }
+
+    static inline __forceinline unsigned long bsc_bit_scan_forward(unsigned long x) 
+    {
+       unsigned long index;
+       _BitScanForward(&index, x);
+       return index;
+    }
+#endif
+
 #define ALPHABET_SIZE (256)
 
 #define LIBBSC_CPU_FEATURE_NONE      0
