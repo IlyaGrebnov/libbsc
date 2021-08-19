@@ -666,8 +666,15 @@ void Decompression(char * argv[])
 
 void ShowUsage(void)
 {
+#if !defined(BSC_DECOMPRESSION_ONLY)
     fprintf(stdout, "Usage: bsc <e|d> inputfile outputfile <options>\n\n");
+#elif defined(LIBBSC_CUDA_SUPPORT) || defined(_WIN32) || defined(LIBBSC_OPENMP)
+    fprintf(stdout, "Usage: bsc d inputfile outputfile <options>\n\n");
+#else
+    fprintf(stdout, "Usage: bsc d inputfile outputfile\n\n");
+#endif
 
+#if !defined(BSC_DECOMPRESSION_ONLY)
     fprintf(stdout, "Block sorting options:\n");
     fprintf(stdout, "  -b<size> Block size in megabytes, default: -b25\n");
     fprintf(stdout, "             minimum: -b1, maximum: -b2047\n");
@@ -692,9 +699,11 @@ void ShowUsage(void)
     fprintf(stdout, "  -H<size> LZP dictionary size in bits, default: -H16\n");
     fprintf(stdout, "             minimum: -H10, maximum: -H28\n");
     fprintf(stdout, "  -M<size> LZP minimum match length, default: -M128\n");
-    fprintf(stdout, "             minimum: -M4, maximum: -M255\n");
+    fprintf(stdout, "             minimum: -M4, maximum: -M255\n\n");
+#endif
 
-    fprintf(stdout, "\nPlatform specific options:\n");
+#if defined(LIBBSC_CUDA_SUPPORT) || defined(_WIN32) || defined(LIBBSC_OPENMP)
+    fprintf(stdout, "Platform specific options:\n");
 #ifdef LIBBSC_CUDA_SUPPORT
     fprintf(stdout, "  -G       Enable Sort Transform acceleration on NVIDIA GPU, default: disable\n");
 #endif
@@ -705,8 +714,13 @@ void ShowUsage(void)
     fprintf(stdout, "  -t       Disable parallel blocks processing, default: enable\n");
     fprintf(stdout, "  -T       Disable multi-core systems support, default: enable\n");
 #endif
+    fprintf(stdout, "\n");
+#endif
 
-    fprintf(stdout,"\nOptions may be combined into one, like -b128p -m5e1\n");
+#if !defined(BSC_DECOMPRESSION_ONLY) || defined(LIBBSC_CUDA_SUPPORT) || defined(_WIN32) || defined(LIBBSC_OPENMP)
+    fprintf(stdout,"Options may be combined into one, like -b128p -m5e1\n");
+#endif
+
     exit(0);
 }
 
@@ -854,7 +868,9 @@ int main(int argc, char * argv[])
 
     switch (*argv[1])
     {
+#if !defined(BSC_DECOMPRESSION_ONLY)
         case 'e' : case 'E' : Compression(argv); break;
+#endif
         case 'd' : case 'D' : Decompression(argv); break;
         default  : ShowUsage();
     }
