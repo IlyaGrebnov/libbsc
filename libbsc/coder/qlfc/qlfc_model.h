@@ -180,14 +180,6 @@ struct QlfcStatisticalModel
 
 public:
 
-    ProbabilityMixer mixerOfRank[ALPHABET_SIZE];
-    ProbabilityMixer mixerOfRankExponent[8][8];
-    ProbabilityMixer mixerOfRankMantissa[8];
-    ProbabilityMixer mixerOfRankEscape[ALPHABET_SIZE];
-    ProbabilityMixer mixerOfRun[ALPHABET_SIZE];
-    ProbabilityMixer mixerOfRunExponent[32][32];
-    ProbabilityMixer mixerOfRunMantissa[32];
-
     struct Rank
     {
         short StaticModel;
@@ -238,6 +230,14 @@ public:
         } Mantissa[32];
 
     } Run;
+
+    ProbabilityMixer mixerOfRank[ALPHABET_SIZE];
+    ProbabilityMixer mixerOfRankExponent[8][8];
+    ProbabilityMixer mixerOfRankMantissa[8];
+    ProbabilityMixer mixerOfRankEscape[ALPHABET_SIZE];
+    ProbabilityMixer mixerOfRun[ALPHABET_SIZE];
+    ProbabilityMixer mixerOfRunExponent[32][32];
+    ProbabilityMixer mixerOfRunMantissa[32];
 };
 
 int  bsc_qlfc_init_static_model();

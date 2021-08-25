@@ -42,6 +42,14 @@ struct ProbabilityCounter
 
 public:
 
+    static INLINE void UpdateBit(unsigned int bit, short & probability, const int threshold0, const int adaptationRate0, const int threshold1, const int adaptationRate1)
+    {
+        int delta0 = probability * adaptationRate0 - ((4096 - threshold0) * adaptationRate0 - 4095);
+        int delta1 = probability * adaptationRate1 - (threshold1 * adaptationRate1);
+        
+        probability = probability - ((bit ? delta1 : delta0) >> 12);
+    }
+
     static INLINE void UpdateBit0(short & probability, const int threshold, const int adaptationRate)
     {
         probability = probability + (((4096 - threshold - probability) * adaptationRate) >> 12);
@@ -51,7 +59,6 @@ public:
     {
         probability = probability - (((probability - threshold) * adaptationRate) >> 12);
     };
-
 };
 
 struct ProbabilityMixer

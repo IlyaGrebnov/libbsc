@@ -50,6 +50,7 @@ See also the bsc and libbsc web site:
 #define MOD(a)      a %= BASE
 
 #if defined(LIBBSC_DYNAMIC_CPU_DISPATCH)
+    unsigned int bsc_adler32(const unsigned char * T, int n, int features);
     unsigned int bsc_adler32_avx(const unsigned char * T, int n, int features);
     unsigned int bsc_adler32_ssse3(const unsigned char * T, int n, int features);
     unsigned int bsc_adler32_sse2(const unsigned char * T, int n, int features);

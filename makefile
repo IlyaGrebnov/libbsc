@@ -1,6 +1,6 @@
 SHELL = /bin/sh
 
-CC = g++
+CC = clang++
 AR = ar
 RANLIB = ranlib
 
@@ -13,6 +13,9 @@ CFLAGS += -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
 # Comment out CFLAGS line below to disable optimizations
 CFLAGS += -O3 -fomit-frame-pointer -fstrict-aliasing -ffast-math
+
+# Comment out CFLAGS line below to disable AVX2 instruction set (performance will suffer)
+CFLAGS += -mavx2
 
 # Comment out CFLAGS line below to disable OpenMP optimizations
 CFLAGS += -fopenmp -DLIBBSC_OPENMP_SUPPORT

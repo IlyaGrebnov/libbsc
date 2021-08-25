@@ -1,3 +1,7 @@
+Changes in 3.1.9 (August, 25 2021)
+- Updated makefile to use Clang compiler and AVX2 instruction set for maximum performance.
+- Slightly improved compression and decompression performance.
+
 Changes in 3.1.8 (August, 18 2021)
 - Slightly improved compression performance.
 

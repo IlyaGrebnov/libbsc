@@ -147,6 +147,19 @@ public:
         ari.low += range; ari_range -= range;
     }
 
+    INLINE void EncodeBit(unsigned int bit, int probability)
+    {
+        if (ari_range < 0x10000)
+        {
+            ari_range = ShiftLow();
+        }
+
+        unsigned int range = (ari_range >> 12) * probability;
+
+        ari.low   = ari.low + ((~bit + 1u) & range);
+        ari_range = range   + ((~bit + 1u) & (ari_range - range - range));
+    }
+
     INLINE void EncodeBit(unsigned int bit)
     {
         if (bit) EncodeBit1(2048); else EncodeBit0(2048);
