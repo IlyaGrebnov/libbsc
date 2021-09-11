@@ -62,6 +62,7 @@ int bsc_coder_encode_block(const unsigned char * input, unsigned char * output, 
 {
     if (coder == LIBBSC_CODER_QLFC_STATIC)   return bsc_qlfc_static_encode_block  (input, output, inputSize, outputSize);
     if (coder == LIBBSC_CODER_QLFC_ADAPTIVE) return bsc_qlfc_adaptive_encode_block(input, output, inputSize, outputSize);
+    if (coder == LIBBSC_CODER_QLFC_FAST)     return bsc_qlfc_fast_encode_block    (input, output, inputSize, outputSize);
 
     return LIBBSC_BAD_PARAMETER;
 }
@@ -242,7 +243,7 @@ int bsc_coder_compress_parallel(const unsigned char * input, unsigned char * out
 
 int bsc_coder_compress(const unsigned char * input, unsigned char * output, int n, int coder, int features)
 {
-    if ((coder != LIBBSC_CODER_QLFC_STATIC) && (coder != LIBBSC_CODER_QLFC_ADAPTIVE))
+    if ((coder != LIBBSC_CODER_QLFC_STATIC) && (coder != LIBBSC_CODER_QLFC_ADAPTIVE) && (coder != LIBBSC_CODER_QLFC_FAST))
     {
         return LIBBSC_BAD_PARAMETER;
     }
@@ -264,13 +265,14 @@ int bsc_coder_decode_block(const unsigned char * input, unsigned char * output, 
 {
     if (coder == LIBBSC_CODER_QLFC_STATIC)   return bsc_qlfc_static_decode_block  (input, output);
     if (coder == LIBBSC_CODER_QLFC_ADAPTIVE) return bsc_qlfc_adaptive_decode_block(input, output);
+    if (coder == LIBBSC_CODER_QLFC_FAST)     return bsc_qlfc_fast_decode_block    (input, output);
 
     return LIBBSC_BAD_PARAMETER;
 }
 
 int bsc_coder_decompress(const unsigned char * input, unsigned char * output, int coder, int features)
 {
-    if ((coder != LIBBSC_CODER_QLFC_STATIC) && (coder != LIBBSC_CODER_QLFC_ADAPTIVE))
+    if ((coder != LIBBSC_CODER_QLFC_STATIC) && (coder != LIBBSC_CODER_QLFC_ADAPTIVE) && (coder != LIBBSC_CODER_QLFC_FAST))
     {
         return LIBBSC_BAD_PARAMETER;
     }

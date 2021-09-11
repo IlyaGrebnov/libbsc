@@ -38,43 +38,52 @@ See also the bsc and libbsc web site:
 #include "../../libbsc.h"
 #include "../../platform/platform.h"
 
-QlfcStatisticalModel g_QlfcStatisticalModel;
+QlfcStatisticalModel1 g_QlfcStatisticalModel1;
+QlfcStatisticalModel2 g_QlfcStatisticalModel2;
 
-void bsc_qlfc_memset_2048(void * dst, int size)
+void bsc_qlfc_memset(void * dst, int size, short v)
 {
-    for (int i = 0; i < size / 2; ++i) ((short *)dst)[i] = 2048;
+    for (int i = 0; i < size / 2; ++i) ((short *)dst)[i] = v;
 }
 
 int bsc_qlfc_init_static_model()
 {
     for (int mixer = 0; mixer < ALPHABET_SIZE; ++mixer)
     {
-        g_QlfcStatisticalModel.mixerOfRank[mixer].Init();
-        g_QlfcStatisticalModel.mixerOfRankEscape[mixer].Init();
-        g_QlfcStatisticalModel.mixerOfRun[mixer].Init();
+        g_QlfcStatisticalModel1.mixerOfRank[mixer].Init();
+        g_QlfcStatisticalModel1.mixerOfRankEscape[mixer].Init();
+        g_QlfcStatisticalModel1.mixerOfRun[mixer].Init();
     }
     for (int bit = 0; bit < 8; ++bit)
     {
-        g_QlfcStatisticalModel.mixerOfRankMantissa[bit].Init();
+        g_QlfcStatisticalModel1.mixerOfRankMantissa[bit].Init();
         for (int context = 0; context < 8; ++context)
-            g_QlfcStatisticalModel.mixerOfRankExponent[context][bit].Init();
+            g_QlfcStatisticalModel1.mixerOfRankExponent[context][bit].Init();
     }
     for (int bit = 0; bit < 32; ++bit)
     {
-        g_QlfcStatisticalModel.mixerOfRunMantissa[bit].Init();
+        g_QlfcStatisticalModel1.mixerOfRunMantissa[bit].Init();
         for (int context = 0; context < 32; ++context)
-            g_QlfcStatisticalModel.mixerOfRunExponent[context][bit].Init();
+            g_QlfcStatisticalModel1.mixerOfRunExponent[context][bit].Init();
     }
 
-    bsc_qlfc_memset_2048(&g_QlfcStatisticalModel.Rank, sizeof(g_QlfcStatisticalModel.Rank));
-    bsc_qlfc_memset_2048(&g_QlfcStatisticalModel.Run, sizeof(g_QlfcStatisticalModel.Run));
+    bsc_qlfc_memset(&g_QlfcStatisticalModel1.Rank, sizeof(g_QlfcStatisticalModel1.Rank), 2048);
+    bsc_qlfc_memset(&g_QlfcStatisticalModel1.Run, sizeof(g_QlfcStatisticalModel1.Run), 2048);
+
+    bsc_qlfc_memset(&g_QlfcStatisticalModel2.Rank, sizeof(g_QlfcStatisticalModel2.Rank), 4096);
+    bsc_qlfc_memset(&g_QlfcStatisticalModel2.Run, sizeof(g_QlfcStatisticalModel2.Run), 1024);
 
     return LIBBSC_NO_ERROR;
 }
 
-void bsc_qlfc_init_model(QlfcStatisticalModel * model)
+void bsc_qlfc_init_model(QlfcStatisticalModel1 * model)
 {
-    memcpy(model, &g_QlfcStatisticalModel, sizeof(QlfcStatisticalModel));
+    memcpy(model, &g_QlfcStatisticalModel1, sizeof(QlfcStatisticalModel1));
+}
+
+void bsc_qlfc_init_model(QlfcStatisticalModel2 * model)
+{
+    memcpy(model, &g_QlfcStatisticalModel2, sizeof(QlfcStatisticalModel2));
 }
 
 /*-----------------------------------------------------------*/

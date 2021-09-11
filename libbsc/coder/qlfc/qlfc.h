@@ -65,6 +65,16 @@ extern "C" {
     int bsc_qlfc_adaptive_encode_block(const unsigned char * input, unsigned char * output, int inputSize, int outputSize);
 
     /**
+    * Decompress a memory block using Quantized Local Frequency Coding algorithm.
+    * @param input      - the input memory block of n bytes.
+    * @param output     - the output memory block of n bytes.
+    * @param inputSize  - the length of the input memory block.
+    * @param outputSize - the length of the output memory block.
+    * @return the length of decompressed memory block if no error occurred, error code otherwise.
+    */
+    int bsc_qlfc_fast_encode_block(const unsigned char * input, unsigned char * output, int inputSize, int outputSize);
+
+    /**
     * Compress a memory block using Quantized Local Frequency Coding algorithm.
     * @param input      - the input memory block of n bytes.
     * @param output     - the output memory block of n bytes.
@@ -79,6 +89,14 @@ extern "C" {
     * @return the length of decompressed memory block if no error occurred, error code otherwise.
     */
     int bsc_qlfc_adaptive_decode_block(const unsigned char * input, unsigned char * output);
+
+    /**
+    * Decompress a memory block using Quantized Local Frequency Coding algorithm.
+    * @param input      - the input memory block of n bytes.
+    * @param output     - the output memory block of n bytes.
+    * @return the length of decompressed memory block if no error occurred, error code otherwise.
+    */
+    int bsc_qlfc_fast_decode_block(const unsigned char * input, unsigned char * output);
 
 #ifdef __cplusplus
 }

@@ -688,6 +688,7 @@ void ShowUsage(void)
     fprintf(stdout, "             -cp Preceding contexts\n");
     fprintf(stdout, "             -ca Autodetect (experimental)\n");
     fprintf(stdout, "  -e<algo> Entropy encoding algorithm, default: -e1\n");
+    fprintf(stdout, "             -e0 Fast Quantized Local Frequency Coding\n");
     fprintf(stdout, "             -e1 Static Quantized Local Frequency Coding (default)\n");
     fprintf(stdout, "             -e2 Adaptive Quantized Local Frequency Coding (best compression)\n");
    
@@ -780,6 +781,7 @@ void ProcessSwitch(char * s)
             {
                 switch (*s++)
                 {
+                    case '0' : paramCoder = LIBBSC_CODER_QLFC_FAST;     break;
                     case '1' : paramCoder = LIBBSC_CODER_QLFC_STATIC;   break;
                     case '2' : paramCoder = LIBBSC_CODER_QLFC_ADAPTIVE; break;
                     default  : ShowUsage();
@@ -849,7 +851,7 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.1.9. 25 August 2021.\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.2.0. 10 September 2021.\n");
     fprintf(stdout, "Copyright (c) 2009-2021 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)

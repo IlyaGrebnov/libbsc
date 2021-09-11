@@ -62,6 +62,7 @@ See also the bsc and libbsc web site:
 #define LIBBSC_CODER_NONE              0
 #define LIBBSC_CODER_QLFC_STATIC       1
 #define LIBBSC_CODER_QLFC_ADAPTIVE     2
+#define LIBBSC_CODER_QLFC_FAST         3
 
 #define LIBBSC_FEATURE_NONE            0
 #define LIBBSC_FEATURE_FASTMODE        1

@@ -1,3 +1,6 @@
+Changes in 3.2.0 (September, 10 2021)
+- New BWT / ST post-coder for fast compression and decompression.
+
 Changes in 3.1.9 (August, 25 2021)
 - Updated makefile to use Clang compiler and AVX2 instruction set for maximum performance.
 - Slightly improved compression and decompression performance.

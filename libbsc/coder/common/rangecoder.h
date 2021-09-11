@@ -126,35 +126,35 @@ public:
         return (int)(ari_output - ari_outputStart) * sizeof(ari_output[0]);
     }
 
-    INLINE void EncodeBit0(int probability)
+    template <int P = 12> INLINE void EncodeBit0(int probability)
     {
         if (ari_range < 0x10000)
         {
             ari_range = ShiftLow();
         }
 
-        ari_range = (ari_range >> 12) * probability;
+        ari_range = (ari_range >> P) * probability;
     }
 
-    INLINE void EncodeBit1(int probability)
+    template <int P = 12> INLINE void EncodeBit1(int probability)
     {
         if (ari_range < 0x10000)
         {
             ari_range = ShiftLow();
         }
 
-        unsigned int range = (ari_range >> 12) * probability;
+        unsigned int range = (ari_range >> P) * probability;
         ari.low += range; ari_range -= range;
     }
 
-    INLINE void EncodeBit(unsigned int bit, int probability)
+    template <int P = 12> INLINE void EncodeBit(unsigned int bit, int probability)
     {
         if (ari_range < 0x10000)
         {
             ari_range = ShiftLow();
         }
 
-        unsigned int range = (ari_range >> 12) * probability;
+        unsigned int range = (ari_range >> P) * probability;
 
         ari.low   = ari.low + ((~bit + 1u) & range);
         ari_range = range   + ((~bit + 1u) & (ari_range - range - range));
@@ -191,20 +191,41 @@ public:
         ari_code  = (ari_code << 16) | InputShort();
     };
 
-    INLINE int DecodeBit(int probability)
+    template <int P = 12> INLINE int PeakBit(int probability)
     {
         if (ari_range < 0x10000)
         {
             ari_range <<= 16; ari_code = (ari_code << 16) | InputShort();
         }
 
-        unsigned int range = (ari_range >> 12) * probability;
+        return ari_code >= (ari_range >> P) * probability;
+    }
+
+    template <int P = 12> INLINE int DecodeBit(int probability)
+    {
+        if (ari_range < 0x10000)
+        {
+            ari_range <<= 16; ari_code = (ari_code << 16) | InputShort();
+        }
+
+        unsigned int range = (ari_range >> P) * probability;
         int bit = ari_code >= range;
 
         ari_range = bit ? ari_range - range : range;
         ari_code  = bit ? ari_code  - range : ari_code;
 
         return bit;
+    }
+
+    template <int P = 12> INLINE void DecodeBit0(int probability)
+    {
+        ari_range = (ari_range >> P) * probability;
+    }
+
+    template <int P = 12> INLINE void DecodeBit1(int probability)
+    {
+        unsigned int range = (ari_range >> P) * probability;
+        ari_code -= range; ari_range -= range;
     }
 
     INLINE unsigned int DecodeBit()

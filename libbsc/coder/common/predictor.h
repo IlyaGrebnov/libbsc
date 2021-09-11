@@ -59,6 +59,16 @@ public:
     {
         probability = probability - (((probability - threshold) * adaptationRate) >> 12);
     };
+
+    template <int R> static INLINE void UpdateBit(unsigned int bit, short & probability, const int threshold0, const int threshold1)
+    {
+        probability = probability - ((probability - (bit ? threshold1 : threshold0)) >> R);
+    }
+
+    template <int R> static INLINE void UpdateBit(short & probability, const int threshold)
+    {
+        probability = probability - ((probability - threshold) >> R);
+    };
 };
 
 struct ProbabilityMixer

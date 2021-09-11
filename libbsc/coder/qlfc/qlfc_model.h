@@ -175,7 +175,7 @@ const int F_RUN_MP_TH1 = -214; const int F_RUN_MP_AR1 =   19;
 const int F_RUN_MM_LR0 =    7; const int F_RUN_MM_LR1 =   15;
 const int F_RUN_MM_LR2 =   10;
 
-struct QlfcStatisticalModel
+struct QlfcStatisticalModel1
 {
 
 public:
@@ -240,8 +240,27 @@ public:
     ProbabilityMixer mixerOfRunMantissa[32];
 };
 
+struct QlfcStatisticalModel2
+{
+
+public:
+
+    struct Rank
+    {
+        short Exponent[ALPHABET_SIZE][8];
+        short Mantissa[ALPHABET_SIZE][8][ALPHABET_SIZE];
+    } Rank;
+
+    struct Run
+    {
+        short Exponent[ALPHABET_SIZE][32];
+        short Mantissa[ALPHABET_SIZE][32][32];
+    } Run;
+};
+
 int  bsc_qlfc_init_static_model();
-void bsc_qlfc_init_model(QlfcStatisticalModel * model);
+void bsc_qlfc_init_model(QlfcStatisticalModel1 * model);
+void bsc_qlfc_init_model(QlfcStatisticalModel2 * model);
 
 #endif
 

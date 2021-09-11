@@ -51,37 +51,53 @@ See also the bsc and libbsc web site:
     unsigned char * bsc_qlfc_transform_avx(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
     unsigned char * bsc_qlfc_transform_sse2(const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable);
 
-    int bsc_qlfc_adaptive_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model);
-    int bsc_qlfc_adaptive_encode_avx2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model);
-    int bsc_qlfc_adaptive_encode_sse2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model);
+    int bsc_qlfc_adaptive_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_adaptive_encode_avx2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_adaptive_encode_sse2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model);
 
-    int bsc_qlfc_static_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model);
-    int bsc_qlfc_static_encode_avx2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model);
-    int bsc_qlfc_static_encode_sse2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model);
+    int bsc_qlfc_static_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_static_encode_avx2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_static_encode_sse2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model);
 
-    int bsc_qlfc_adaptive_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
-    int bsc_qlfc_adaptive_decode_avx(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
-    int bsc_qlfc_adaptive_decode_sse41(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
-    int bsc_qlfc_adaptive_decode_sse2(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
+    int bsc_qlfc_fast_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel2 * model);
+    int bsc_qlfc_fast_encode_avx2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel2 * model);
+    int bsc_qlfc_fast_encode_sse2(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel2 * model);
 
-    int bsc_qlfc_static_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
-    int bsc_qlfc_static_decode_avx(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
-    int bsc_qlfc_static_decode_sse41(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
-    int bsc_qlfc_static_decode_sse2(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model);
+    int bsc_qlfc_adaptive_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_adaptive_decode_avx(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_adaptive_decode_sse41(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_adaptive_decode_sse2(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model);
+
+    int bsc_qlfc_static_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_static_decode_avx(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_static_decode_sse41(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model);
+    int bsc_qlfc_static_decode_sse2(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model);
+
+    int bsc_qlfc_fast_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel2 * model);
+    int bsc_qlfc_fast_decode_avx(const unsigned char * input, unsigned char * output, QlfcStatisticalModel2 * model);
+    int bsc_qlfc_fast_decode_sse41(const unsigned char * input, unsigned char * output, QlfcStatisticalModel2 * model);
+    int bsc_qlfc_fast_decode_sse2(const unsigned char * input, unsigned char * output, QlfcStatisticalModel2 * model);
 
     #if LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
-        int bsc_qlfc_adaptive_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model)
+        int bsc_qlfc_adaptive_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model)
         {
             if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX2) { return bsc_qlfc_adaptive_encode_avx2(input, output, buffer, inputSize, outputSize, model); }
 
             return bsc_qlfc_adaptive_encode_sse2(input, output, buffer, inputSize, outputSize, model);
         }
 
-        int bsc_qlfc_static_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model)
+        int bsc_qlfc_static_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model)
         {
             if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX2) { return bsc_qlfc_static_encode_avx2(input, output, buffer, inputSize, outputSize, model); }
 
             return bsc_qlfc_static_encode_sse2(input, output, buffer, inputSize, outputSize, model);
+        }
+
+        int bsc_qlfc_fast_encode(const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel2 * model)
+        {
+            if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX2) { return bsc_qlfc_fast_encode_avx2(input, output, buffer, inputSize, outputSize, model); }
+
+            return bsc_qlfc_fast_encode_sse2(input, output, buffer, inputSize, outputSize, model);
         }
 
         unsigned char * bsc_qlfc_transform(const unsigned char * input, unsigned char * buffer, int n, unsigned char * MTFTable)
@@ -92,7 +108,7 @@ See also the bsc and libbsc web site:
             return bsc_qlfc_transform_sse2(input, buffer, n, MTFTable);
         }
 
-        int bsc_qlfc_adaptive_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
+        int bsc_qlfc_adaptive_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model)
         {
             if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX)   { return bsc_qlfc_adaptive_decode_avx  (input, output, model); }
             if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_SSE41) { return bsc_qlfc_adaptive_decode_sse41(input, output, model); }
@@ -100,12 +116,20 @@ See also the bsc and libbsc web site:
             return bsc_qlfc_adaptive_decode_sse2(input, output, model);
         }
 
-        int bsc_qlfc_static_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
+        int bsc_qlfc_static_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model)
         {
             if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX)   { return bsc_qlfc_static_decode_avx  (input, output, model); }
             if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_SSE41) { return bsc_qlfc_static_decode_sse41(input, output, model); }
 
             return bsc_qlfc_static_decode_sse2(input, output, model);
+        }
+
+        int bsc_qlfc_fast_decode(const unsigned char * input, unsigned char * output, QlfcStatisticalModel2 * model)
+        {
+            if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_AVX)   { return bsc_qlfc_fast_decode_avx  (input, output, model); }
+            if (bsc_get_cpu_features() >= LIBBSC_CPU_FEATURE_SSE41) { return bsc_qlfc_fast_decode_sse41(input, output, model); }
+
+            return bsc_qlfc_fast_decode_sse2(input, output, model);
         }
     #endif
 
@@ -114,29 +138,36 @@ See also the bsc and libbsc web site:
         #define QLFC_TRANSFORM_SCAN_FUNCTION_NAME  bsc_qlfc_transform_scan_avx2
         #define QLFC_ADAPTIVE_ENCODE_FUNCTION_NAME bsc_qlfc_adaptive_encode_avx2
         #define QLFC_STATIC_ENCODE_FUNCTION_NAME   bsc_qlfc_static_encode_avx2
+        #define QLFC_FAST_ENCODE_FUNCTION_NAME     bsc_qlfc_fast_encode_avx2
     #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_AVX
         #define QLFC_TRANSFORM_FUNCTION_NAME       bsc_qlfc_transform_avx
         #define QLFC_TRANSFORM_SCAN_FUNCTION_NAME  bsc_qlfc_transform_scan_avx
         #define QLFC_ADAPTIVE_DECODE_FUNCTION_NAME bsc_qlfc_adaptive_decode_avx
         #define QLFC_STATIC_DECODE_FUNCTION_NAME   bsc_qlfc_static_decode_avx
+        #define QLFC_FAST_DECODE_FUNCTION_NAME     bsc_qlfc_fast_decode_avx
     #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE41
         #define QLFC_ADAPTIVE_DECODE_FUNCTION_NAME bsc_qlfc_adaptive_decode_sse41
         #define QLFC_STATIC_DECODE_FUNCTION_NAME   bsc_qlfc_static_decode_sse41
+        #define QLFC_FAST_DECODE_FUNCTION_NAME     bsc_qlfc_fast_decode_sse41
     #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
         #define QLFC_TRANSFORM_FUNCTION_NAME       bsc_qlfc_transform_sse2
         #define QLFC_TRANSFORM_SCAN_FUNCTION_NAME  bsc_qlfc_transform_scan_sse2
         #define QLFC_ADAPTIVE_ENCODE_FUNCTION_NAME bsc_qlfc_adaptive_encode_sse2
         #define QLFC_STATIC_ENCODE_FUNCTION_NAME   bsc_qlfc_static_encode_sse2
+        #define QLFC_FAST_ENCODE_FUNCTION_NAME     bsc_qlfc_fast_encode_sse2
         #define QLFC_ADAPTIVE_DECODE_FUNCTION_NAME bsc_qlfc_adaptive_decode_sse2
         #define QLFC_STATIC_DECODE_FUNCTION_NAME   bsc_qlfc_static_decode_sse2
+        #define QLFC_FAST_DECODE_FUNCTION_NAME     bsc_qlfc_fast_decode_sse2
     #endif
 #else
     #define QLFC_TRANSFORM_FUNCTION_NAME       bsc_qlfc_transform
     #define QLFC_TRANSFORM_SCAN_FUNCTION_NAME  bsc_qlfc_transform_scan
     #define QLFC_ADAPTIVE_ENCODE_FUNCTION_NAME bsc_qlfc_adaptive_encode
     #define QLFC_STATIC_ENCODE_FUNCTION_NAME   bsc_qlfc_static_encode
+    #define QLFC_FAST_ENCODE_FUNCTION_NAME     bsc_qlfc_fast_encode
     #define QLFC_ADAPTIVE_DECODE_FUNCTION_NAME bsc_qlfc_adaptive_decode
     #define QLFC_STATIC_DECODE_FUNCTION_NAME   bsc_qlfc_static_decode
+    #define QLFC_FAST_DECODE_FUNCTION_NAME     bsc_qlfc_fast_decode
 #endif
 
 #if defined(QLFC_TRANSFORM_FUNCTION_NAME)
@@ -290,7 +321,7 @@ unsigned char * QLFC_TRANSFORM_FUNCTION_NAME (const unsigned char * RESTRICT inp
 
 #if defined(QLFC_ADAPTIVE_ENCODE_FUNCTION_NAME)
 
-int QLFC_ADAPTIVE_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model)
+int QLFC_ADAPTIVE_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model)
 {
     unsigned char MTFTable[ALPHABET_SIZE];
 
@@ -642,7 +673,7 @@ int QLFC_ADAPTIVE_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned ch
 
 #if defined(QLFC_STATIC_ENCODE_FUNCTION_NAME)
 
-int QLFC_STATIC_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel * model)
+int QLFC_STATIC_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, unsigned char * buffer, int inputSize, int outputSize, QlfcStatisticalModel1 * model)
 {
     unsigned char MTFTable[ALPHABET_SIZE];
 
@@ -932,7 +963,195 @@ int QLFC_STATIC_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned char
 
 #endif
 
-#if (defined(QLFC_ADAPTIVE_DECODE_FUNCTION_NAME) || defined(QLFC_STATIC_DECODE_FUNCTION_NAME)) && (LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE41)
+#if defined(QLFC_FAST_ENCODE_FUNCTION_NAME)
+
+int QLFC_FAST_ENCODE_FUNCTION_NAME (const unsigned char * RESTRICT input, unsigned char * RESTRICT output, unsigned char * RESTRICT buffer, int inputSize, int outputSize, QlfcStatisticalModel2 * model)
+{
+    unsigned char MTFTable[ALPHABET_SIZE];
+
+    bsc_qlfc_init_model(model);
+
+    unsigned char * RESTRICT ranks = bsc_qlfc_transform(input, buffer, inputSize, MTFTable);
+
+    RangeCoder coder;
+
+    coder.InitEncoder(output, outputSize);
+    coder.EncodeWord((unsigned int)inputSize);
+
+    unsigned char usedChar[ALPHABET_SIZE];
+    for (int i = 0; i < ALPHABET_SIZE; ++i) usedChar[i] = 0;
+
+    int prevChar = -1;
+    for (int rank = 0; rank < ALPHABET_SIZE; ++rank)
+    {
+        int currentChar = MTFTable[rank];
+
+        for (int bit = 7; bit >= 0; --bit)
+        {
+            bool bit0 = false, bit1 = false;
+
+            for (int c = 0; c < ALPHABET_SIZE; ++c)
+            {
+                if (c == prevChar || usedChar[c] == 0)
+                {
+                    if ((currentChar >> (bit + 1)) == (c >> (bit + 1)))
+                    {
+                        if (c & (1 << bit)) bit1 = true; else bit0 = true;
+                        if (bit0 && bit1) break;
+                    }
+                }
+            }
+
+            if (bit0 && bit1)
+            {
+                coder.EncodeBit<1>(currentChar & (1 << bit), 1);
+            }
+        }
+
+        if (currentChar == prevChar)
+        {
+            break;
+        }
+
+        prevChar = currentChar; usedChar[currentChar] = 1;
+    }
+
+    const unsigned char * inputEnd      = input  + inputSize;
+    const unsigned char * ranksEnd      = buffer + inputSize;
+
+    for (; ranks < ranksEnd; )
+    {
+        unsigned int currentRank = *ranks++;
+        unsigned int currentChar = *input;
+        unsigned int currentRun;
+
+        {
+            const unsigned char * runStart = input++;
+
+            if (ranks < ranksEnd - 16)
+            {
+#if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE2
+                __m128i v = _mm_set1_epi8(currentChar);
+
+                while (true)
+                {
+                   int m = _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)input), v));
+                   if (m != 0xffff)
+                   {
+                      input += bsc_bit_scan_forward((unsigned int)(~m));
+                      break;
+                   }
+
+                   input += 16;
+                }
+#else
+                while (*input == currentChar) { input++; }
+#endif
+            }
+            else
+            {
+                while ((input < inputEnd) && (*input == currentChar)) { input++; }
+            }
+
+            currentRun = (unsigned int)(input - runStart);
+        }
+
+        {
+            short * RESTRICT predictor = &model->Rank.Exponent[currentChar][0];
+
+            if (currentRank == 1)
+            {
+                int p = predictor[0]; ProbabilityCounter::UpdateBit<4>(predictor[0], 8016); coder.EncodeBit0<13>(p);
+            }
+            else
+            {
+                {
+                    int p = predictor[0]; ProbabilityCounter::UpdateBit<4>(predictor[0], 83); coder.EncodeBit1<13>(p);
+                }
+
+                int bitRankSize = bsc_bit_scan_reverse(currentRank);
+
+                for (int bit = 1; bit < bitRankSize; ++bit)
+                {
+                    int p = predictor[bit]; ProbabilityCounter::UpdateBit<4>(predictor[bit], 122); coder.EncodeBit1<13>(p);
+                }
+
+                if (bitRankSize < 7)
+                {
+                    int p = predictor[bitRankSize]; ProbabilityCounter::UpdateBit<4>(predictor[bitRankSize], 8114); coder.EncodeBit0<13>(p);
+                }
+
+                predictor = &model->Rank.Mantissa[currentChar][bitRankSize][0];
+
+                for (int context = 1, bit = bitRankSize - 1; bit >= 0; --bit)
+                {
+                    unsigned int b = (currentRank >> bit) & 1;
+
+                    int p = predictor[context]; ProbabilityCounter::UpdateBit<7>(b, predictor[context], 7999, 235); coder.EncodeBit<13>(b, p);
+
+                    context += context + b; 
+                }
+            }
+        }
+
+        {
+            short * RESTRICT predictor = &model->Run.Exponent[currentChar][0];
+
+            if (currentRun == 1)
+            {
+                int p = predictor[0]; ProbabilityCounter::UpdateBit<5>(predictor[0], 2025); coder.EncodeBit0<11>(p);
+            }
+            else
+            {
+                {
+                    int p = predictor[0]; ProbabilityCounter::UpdateBit<5>(predictor[0], 42); coder.EncodeBit1<11>(p);
+                }
+
+                int bitRunSize = bsc_bit_scan_reverse(currentRun);
+
+                for (int bit = 1; bit < bitRunSize; ++bit)
+                {
+                    int p = predictor[bit]; ProbabilityCounter::UpdateBit<4>(predictor[bit], 142); coder.EncodeBit1<11>(p);
+                }
+
+                {
+                    int p = predictor[bitRunSize]; ProbabilityCounter::UpdateBit<4>(predictor[bitRunSize], 1962); coder.EncodeBit0<11>(p);
+                }
+
+                predictor = &model->Run.Mantissa[currentChar][bitRunSize][0];
+
+                if (bitRunSize <= 5)
+                {
+                    for (int context = 1, bit = bitRunSize - 1; bit >= 0; --bit)
+                    {
+                        unsigned int b = (currentRun >> bit) & 1;
+
+                        int p = predictor[context]; ProbabilityCounter::UpdateBit<6>(b, predictor[context], 1951, 147); coder.EncodeBit<11>(b, p);
+
+                        context += context + b;
+                    }
+                }
+                else
+                {
+                    for (int context = 1, bit = bitRunSize - 1; bit >= 0; --bit)
+                    {
+                        unsigned int b = (currentRun >> bit) & 1;
+
+                        int p = predictor[context]; ProbabilityCounter::UpdateBit<5>(b, predictor[context], 1987, 46); coder.EncodeBit<11>(b, p);
+
+                        context += 1;
+                    }
+                }
+            }
+        }
+    }
+    
+    return coder.FinishEncoder();
+}
+
+#endif
+
+#if (defined(QLFC_ADAPTIVE_DECODE_FUNCTION_NAME) || defined(QLFC_STATIC_DECODE_FUNCTION_NAME) || defined(QLFC_FAST_DECODE_FUNCTION_NAME)) && (LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE41)
 
 static const __m128i ALIGNED(64) rank16_shuffle[16] =
 {
@@ -958,7 +1177,7 @@ static const __m128i ALIGNED(64) rank16_shuffle[16] =
 
 #if defined(QLFC_ADAPTIVE_DECODE_FUNCTION_NAME)
 
-int QLFC_ADAPTIVE_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
+int QLFC_ADAPTIVE_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model)
 {
     RangeCoder coder;
 
@@ -1256,7 +1475,7 @@ int QLFC_ADAPTIVE_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned ch
 
 #if defined(QLFC_STATIC_DECODE_FUNCTION_NAME)
 
-int QLFC_STATIC_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, QlfcStatisticalModel * model)
+int QLFC_STATIC_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, QlfcStatisticalModel1 * model)
 {
     RangeCoder coder;
 
@@ -1507,6 +1726,198 @@ int QLFC_STATIC_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char
 
 #endif
 
+#if defined(QLFC_STATIC_DECODE_FUNCTION_NAME)
+
+int QLFC_FAST_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char * output, QlfcStatisticalModel2 * model)
+{
+    unsigned char ALIGNED(64) MTFTable[ALPHABET_SIZE];
+
+    bsc_qlfc_init_model(model);
+
+    RangeCoder coder;
+    coder.InitDecoder(input);
+
+    int n = (int)coder.DecodeWord();
+
+    unsigned char usedChar[ALPHABET_SIZE];
+    for (int i = 0; i < ALPHABET_SIZE; ++i) usedChar[i] = 0;
+
+    int prevChar = -1;
+    for (int rank = 0; rank < ALPHABET_SIZE; ++rank)
+    {
+        int currentChar = 0;
+
+        for (int bit = 7; bit >= 0; --bit)
+        {
+            bool bit0 = false, bit1 = false;
+
+            for (int c = 0; c < ALPHABET_SIZE; ++c)
+            {
+                if (c == prevChar || usedChar[c] == 0)
+                {
+                    if (currentChar == (c >> (bit + 1)))
+                    {
+                        if (c & (1 << bit)) bit1 = true; else bit0 = true;
+                        if (bit0 && bit1) break;
+                    }
+                }
+            }
+
+            if (bit0 && bit1)
+            {
+                currentChar += currentChar + coder.DecodeBit<1>(1);
+            }
+            else
+            {
+                if (bit0) currentChar += currentChar + 0;
+                if (bit1) currentChar += currentChar + 1;
+            }
+        }
+
+        MTFTable[rank] =  currentChar;
+
+        if (currentChar == prevChar)
+        {
+            break;
+        }
+
+        prevChar = currentChar; usedChar[currentChar] = 1;
+    }
+
+    const unsigned char * outputEnd = output + n;
+
+    for (; output < outputEnd; )
+    {
+        unsigned int currentChar = MTFTable[0];
+
+        {
+            short * RESTRICT predictor = &model->Rank.Exponent[currentChar][0];
+
+            int p = predictor[0];
+            if (coder.PeakBit<13>(p))
+            {
+                ProbabilityCounter::UpdateBit<4>(predictor[0], 83);
+                coder.DecodeBit1<13>(p);
+
+                int bitRankSize = 1;
+                while (bitRankSize < 7)
+                {
+                    p = predictor[bitRankSize];
+                    if (coder.PeakBit<13>(p))
+                    {
+                        ProbabilityCounter::UpdateBit<4>(predictor[bitRankSize], 122);
+                        bitRankSize++;
+                        coder.DecodeBit1<13>(p);
+                    }
+                    else
+                    {
+                        ProbabilityCounter::UpdateBit<4>(predictor[bitRankSize], 8114);
+                        coder.DecodeBit0<13>(p);
+                        break;
+                    }
+                }
+
+                predictor = & model->Rank.Mantissa[currentChar][bitRankSize][0];
+
+                unsigned int rank = 1;
+                while (--bitRankSize >= 0)
+                {
+                    unsigned int b = coder.DecodeBit<13>(predictor[rank]);
+                    ProbabilityCounter::UpdateBit<7>(b, predictor[rank], 7999, 235);
+                    rank += rank + b;
+                }
+
+                {
+#if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE41
+                    __m128i * MTFTable_p = (__m128i *)&MTFTable[rank & (-16)];
+                    __m128i r = _mm_load_si128(MTFTable_p); _mm_store_si128(MTFTable_p, _mm_shuffle_epi8(_mm_insert_epi8(r, currentChar, 0), rank16_shuffle[rank & 15]));
+
+                    while ((--MTFTable_p) >= (__m128i *)MTFTable)
+                    {
+                        __m128i t = _mm_load_si128(MTFTable_p); _mm_store_si128(MTFTable_p, _mm_alignr_epi8(r, t, 1)); r = t;
+                    }
+#else
+                    for (unsigned int r = 0; r < rank; ++r)
+                    {
+                        MTFTable[r] = MTFTable[r + 1];
+                    }
+
+                    MTFTable[rank] = currentChar;
+#endif
+                }
+            }
+            else
+            {
+                MTFTable[0] = MTFTable[1]; MTFTable[1] = currentChar; ProbabilityCounter::UpdateBit<4>(predictor[0], 8016); coder.DecodeBit0<13>(p);
+            }
+        }
+
+        {
+            short * RESTRICT predictor = &model->Run.Exponent[currentChar][0];
+
+            int p = predictor[0];
+            if (coder.PeakBit<11>(p))
+            {
+                ProbabilityCounter::UpdateBit<5>(predictor[0], 42);
+                coder.DecodeBit1<11>(p);
+
+                int bitRunSize = 1;
+                while (true)
+                {
+                    p = predictor[bitRunSize];
+                    if (coder.PeakBit<11>(p))
+                    {
+                        ProbabilityCounter::UpdateBit<4>(predictor[bitRunSize], 142);
+                        bitRunSize++;
+                        coder.DecodeBit1<11>(p);
+                    }
+                    else
+                    {
+                        ProbabilityCounter::UpdateBit<4>(predictor[bitRunSize], 1962);
+                        coder.DecodeBit0<11>(p);
+                        break;
+                    }
+                }
+
+                predictor = &model->Run.Mantissa[currentChar][bitRunSize][0];
+
+                if (bitRunSize <= 5)
+                {
+                    unsigned int runSize = 1;
+                    while (--bitRunSize >= 0)
+                    {
+                        unsigned int b = coder.DecodeBit<11>(predictor[runSize]);
+                        ProbabilityCounter::UpdateBit<6>(b, predictor[runSize], 1951, 147);
+                        runSize += runSize + b;
+                    }
+
+                    for (; runSize > 0; --runSize) { *output++ = currentChar; }
+                }
+                else
+                {
+                    unsigned int runSize = 1;
+                    for (int context = 1; context <= bitRunSize; ++context)
+                    {
+                        unsigned int b = coder.DecodeBit<11>(predictor[context]);
+                        ProbabilityCounter::UpdateBit<5>(b, predictor[context], 1987, 46);
+                        runSize += runSize + b;
+                    }
+
+                    for (; runSize > 0; --runSize) { *output++ = currentChar; }
+                }
+            }
+            else
+            {
+                *output++ = currentChar; ProbabilityCounter::UpdateBit<5>(predictor[0], 2025); coder.DecodeBit0<11>(p);
+            }
+        }
+    }
+
+    return n;
+}
+
+#endif
+
 #if !defined(LIBBSC_DYNAMIC_CPU_DISPATCH) || LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_SSE2
 
 int bsc_qlfc_init(int features)
@@ -1516,7 +1927,7 @@ int bsc_qlfc_init(int features)
 
 int bsc_qlfc_static_encode_block(const unsigned char * input, unsigned char * output, int inputSize, int outputSize)
 {
-    if (QlfcStatisticalModel * model = (QlfcStatisticalModel *)bsc_malloc(sizeof(QlfcStatisticalModel)))
+    if (QlfcStatisticalModel1 * model = (QlfcStatisticalModel1 *)bsc_malloc(sizeof(QlfcStatisticalModel1)))
     {
         if (unsigned char * buffer = (unsigned char *)bsc_malloc(inputSize * sizeof(unsigned char)))
         {
@@ -1533,7 +1944,7 @@ int bsc_qlfc_static_encode_block(const unsigned char * input, unsigned char * ou
 
 int bsc_qlfc_adaptive_encode_block(const unsigned char * input, unsigned char * output, int inputSize, int outputSize)
 {
-    if (QlfcStatisticalModel * model = (QlfcStatisticalModel *)bsc_malloc(sizeof(QlfcStatisticalModel)))
+    if (QlfcStatisticalModel1 * model = (QlfcStatisticalModel1 *)bsc_malloc(sizeof(QlfcStatisticalModel1)))
     {
         if (unsigned char * buffer = (unsigned char *)bsc_malloc(inputSize * sizeof(unsigned char)))
         {
@@ -1548,9 +1959,26 @@ int bsc_qlfc_adaptive_encode_block(const unsigned char * input, unsigned char * 
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
+int bsc_qlfc_fast_encode_block(const unsigned char * input, unsigned char * output, int inputSize, int outputSize)
+{
+    if (QlfcStatisticalModel2 * model = (QlfcStatisticalModel2 *)bsc_malloc(sizeof(QlfcStatisticalModel2)))
+    {
+        if (unsigned char * buffer = (unsigned char *)bsc_malloc(inputSize * sizeof(unsigned char)))
+        {
+            int result = bsc_qlfc_fast_encode(input, output, buffer, inputSize, outputSize, model);
+
+            bsc_free(buffer); bsc_free(model);
+
+            return result;
+        };
+        bsc_free(model);
+    };
+    return LIBBSC_NOT_ENOUGH_MEMORY;
+}
+
 int bsc_qlfc_static_decode_block(const unsigned char * input, unsigned char * output)
 {
-    if (QlfcStatisticalModel * model = (QlfcStatisticalModel *)bsc_malloc(sizeof(QlfcStatisticalModel)))
+    if (QlfcStatisticalModel1 * model = (QlfcStatisticalModel1 *)bsc_malloc(sizeof(QlfcStatisticalModel1)))
     {
         int result = bsc_qlfc_static_decode(input, output, model);
 
@@ -1563,9 +1991,22 @@ int bsc_qlfc_static_decode_block(const unsigned char * input, unsigned char * ou
 
 int bsc_qlfc_adaptive_decode_block(const unsigned char * input, unsigned char * output)
 {
-    if (QlfcStatisticalModel * model = (QlfcStatisticalModel *)bsc_malloc(sizeof(QlfcStatisticalModel)))
+    if (QlfcStatisticalModel1 * model = (QlfcStatisticalModel1 *)bsc_malloc(sizeof(QlfcStatisticalModel1)))
     {
         int result = bsc_qlfc_adaptive_decode(input, output, model);
+
+        bsc_free(model);
+
+        return result;
+    };
+    return LIBBSC_NOT_ENOUGH_MEMORY;
+}
+
+int bsc_qlfc_fast_decode_block(const unsigned char * input, unsigned char * output)
+{
+    if (QlfcStatisticalModel2 * model = (QlfcStatisticalModel2 *)bsc_malloc(sizeof(QlfcStatisticalModel2)))
+    {
+        int result = bsc_qlfc_fast_decode(input, output, model);
 
         bsc_free(model);
 
