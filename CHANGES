@@ -1,3 +1,6 @@
+Changes in 3.2.1 (September, 17 2021)
+- Improved performance of LZP algorithm.
+
 Changes in 3.2.0 (September, 10 2021)
 - New BWT / ST post-coder for fast compression and decompression.
 

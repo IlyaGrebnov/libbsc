@@ -71,7 +71,7 @@ int paramEnableCUDA               = 0;
 int paramEnableSegmentation       = 0;
 int paramEnableReordering         = 0;
 int paramEnableLZP                = 1;
-int paramLZPHashSize              = 16;
+int paramLZPHashSize              = 15;
 int paramLZPMinLen                = 128;
 
 int paramFeatures()
@@ -697,7 +697,7 @@ void ShowUsage(void)
     fprintf(stdout, "  -s       Enable segmentation (adaptive block size), default: disable\n");
     fprintf(stdout, "  -r       Enable structured data reordering, default: disable\n");
     fprintf(stdout, "  -l       Enable Lempel-Ziv preprocessing, default: enable\n");
-    fprintf(stdout, "  -H<size> LZP dictionary size in bits, default: -H16\n");
+    fprintf(stdout, "  -H<size> LZP dictionary size in bits, default: -H15\n");
     fprintf(stdout, "             minimum: -H10, maximum: -H28\n");
     fprintf(stdout, "  -M<size> LZP minimum match length, default: -M128\n");
     fprintf(stdout, "             minimum: -M4, maximum: -M255\n\n");
@@ -851,7 +851,7 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.2.0. 10 September 2021.\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.2.1. 17 September 2021.\n");
     fprintf(stdout, "Copyright (c) 2009-2021 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)

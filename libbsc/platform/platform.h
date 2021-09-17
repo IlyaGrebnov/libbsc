@@ -79,9 +79,12 @@ See also the bsc and libbsc web site:
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)
+    #define bsc_byteswap_uint64(x)  (__builtin_bswap64(x))
     #define bsc_bit_scan_reverse(x) (__builtin_clz(x) ^ 31)
     #define bsc_bit_scan_forward(x) (__builtin_ctz(x))
 #elif defined(_MSC_VER)
+    #define bsc_byteswap_uint64(x)  (_byteswap_uint64(x))
+
     #pragma intrinsic(_BitScanReverse)
     #pragma intrinsic(_BitScanForward)
 
