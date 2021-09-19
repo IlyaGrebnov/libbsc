@@ -55,7 +55,7 @@ static INLINE int bsc_lzp_num_blocks(int n)
 template<class T> int bsc_lzp_encode_small(const unsigned char * RESTRICT input, const unsigned char * inputEnd, unsigned char * RESTRICT output, unsigned char * outputEnd, int * RESTRICT lookup, int mask)
 {
     const unsigned char *   inputStart      = input;
-    const unsigned char *   inputMinLenEnd  = inputEnd - sizeof(T) - 16;
+    const unsigned char *   inputMinLenEnd  = inputEnd - sizeof(T) - 32;
 
     const unsigned char *   outputStart     = output;
     const unsigned char *   outputEOB       = outputEnd - 4;
@@ -103,13 +103,14 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
 
                 long long len = sizeof(T);
 
-                for (; input + len < inputMinLenEnd; len += sizeof(unsigned int))
+                for (; input + len < inputMinLenEnd; len += sizeof(unsigned long long))
                 {
-                    if (*(unsigned int *)(input + len) != *(unsigned int *)(reference + len)) break;
+                    unsigned long long m;
+                    if ((m = (*(unsigned long long *)(input + len)) ^ *(unsigned long long *)(reference + len)) != 0) 
+                    {
+                        len += bsc_bit_scan_forward64(m) / 8; break;
+                    }
                 }
-
-                len += sizeof(unsigned short) * (*(unsigned short *)(input + len) == *(unsigned short *)(reference + len));
-                len += sizeof(unsigned char ) * (*(unsigned char  *)(input + len) == *(unsigned char  *)(reference + len));
 
                 input += len; len -= sizeof(T);
 
@@ -148,7 +149,7 @@ LIBBSC_LZP_BAD_MATCH_FOUND1:
 template<class T> int bsc_lzp_encode_small2x(const unsigned char * RESTRICT input, const unsigned char * inputEnd, unsigned char * RESTRICT output, unsigned char * outputEnd, int * RESTRICT lookup, int mask)
 {
     const unsigned char *   inputStart      = input;
-    const unsigned char *   inputMinLenEnd  = inputEnd - sizeof(T) - sizeof(T) - 16;
+    const unsigned char *   inputMinLenEnd  = inputEnd - sizeof(T) - sizeof(T) - 32;
 
     const unsigned char *   outputStart     = output;
     const unsigned char *   outputEOB       = outputEnd - 4;
@@ -196,13 +197,14 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
 
                 long long len = sizeof(T) + sizeof(T);
 
-                for (; input + len < inputMinLenEnd; len += sizeof(unsigned int))
+                for (; input + len < inputMinLenEnd; len += sizeof(unsigned long long))
                 {
-                    if (*(unsigned int *)(input + len) != *(unsigned int *)(reference + len)) break;
+                    unsigned long long m;
+                    if ((m = (*(unsigned long long *)(input + len)) ^ *(unsigned long long *)(reference + len)) != 0) 
+                    {
+                        len += bsc_bit_scan_forward64(m) / 8; break;
+                    }
                 }
-
-                len += sizeof(unsigned short) * (*(unsigned short *)(input + len) == *(unsigned short *)(reference + len));
-                len += sizeof(unsigned char ) * (*(unsigned char  *)(input + len) == *(unsigned char  *)(reference + len));
 
                 input += len; len -= sizeof(T) + sizeof(T);
 
@@ -241,7 +243,7 @@ LIBBSC_LZP_BAD_MATCH_FOUND1:
 template<class T> int bsc_lzp_encode_medium(const unsigned char * RESTRICT input, const unsigned char * inputEnd, unsigned char * RESTRICT output, unsigned char * outputEnd, int * RESTRICT lookup, int mask, int minLen)
 {
     const unsigned char *   inputStart      = input;
-    const unsigned char *   inputMinLenEnd  = inputEnd - sizeof(T) - sizeof(T) - 16;
+    const unsigned char *   inputMinLenEnd  = inputEnd - sizeof(T) - sizeof(T) - 32;
 
     const unsigned char *   outputStart     = output;
     const unsigned char *   outputEOB       = outputEnd - 4;
@@ -289,13 +291,14 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
 
                 long long len = minLen;
 
-                for (; input + len < inputMinLenEnd; len += sizeof(unsigned int))
+                for (; input + len < inputMinLenEnd; len += sizeof(unsigned long long))
                 {
-                    if (*(unsigned int *)(input + len) != *(unsigned int *)(reference + len)) break;
+                    unsigned long long m;
+                    if ((m = (*(unsigned long long *)(input + len)) ^ *(unsigned long long *)(reference + len)) != 0) 
+                    {
+                        len += bsc_bit_scan_forward64(m) / 8; break;
+                    }
                 }
-
-                len += sizeof(unsigned short) * (*(unsigned short *)(input + len) == *(unsigned short *)(reference + len));
-                len += sizeof(unsigned char ) * (*(unsigned char  *)(input + len) == *(unsigned char  *)(reference + len));
 
                 input += len; len -= minLen;
 
@@ -338,7 +341,7 @@ template<class T> int bsc_lzp_encode_large(const unsigned char * RESTRICT input,
     const unsigned char *   outputEOB   = outputEnd - 4;
 
     const unsigned char * heuristic      = input;
-    const unsigned char * inputMinLenEnd = inputEnd - minLen - 16;
+    const unsigned char * inputMinLenEnd = inputEnd - minLen - 32;
 
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
@@ -383,15 +386,16 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
 
                 long long len = sizeof(T);
 
-                for (; input + len < inputMinLenEnd; len += sizeof(unsigned int))
+                for (; input + len < inputMinLenEnd; len += sizeof(unsigned long long))
                 {
-                    if (*(unsigned int *)(input + len) != *(unsigned int *)(reference + len)) break;
+                    unsigned long long m;
+                    if ((m = (*(unsigned long long *)(input + len)) ^ *(unsigned long long *)(reference + len)) != 0) 
+                    {
+                        len += bsc_bit_scan_forward64(m) / 8; break;
+                    }
                 }
 
-                if (len < minLen) { heuristic = input + len + sizeof(T) + 3; goto LIBBSC_LZP_MATCH_NOT_FOUND; }
-
-                len += sizeof(unsigned short) * (*(unsigned short *)(input + len) == *(unsigned short *)(reference + len));
-                len += sizeof(unsigned char ) * (*(unsigned char  *)(input + len) == *(unsigned char  *)(reference + len));
+                if (len < minLen) { heuristic = input + len; goto LIBBSC_LZP_MATCH_NOT_FOUND; }
 
                 input += len; len -= minLen;
 
@@ -441,7 +445,7 @@ int bsc_lzp_encode_generic(const unsigned char * RESTRICT input, const unsigned 
     const unsigned char *   outputEOB   = outputEnd - 4;
 
     const unsigned char * heuristic      = input;
-    const unsigned char * inputMinLenEnd = inputEnd - minLen - 16;
+    const unsigned char * inputMinLenEnd = inputEnd - minLen - 32;
 
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
@@ -528,7 +532,7 @@ LIBBSC_LZP_MATCH_NOT_FOUND:
 
 int bsc_lzp_encode_block(const unsigned char * input, const unsigned char * inputEnd, unsigned char * output, unsigned char * outputEnd, int hashSize, int minLen)
 {
-    if (inputEnd - input - minLen < 16)
+    if (inputEnd - input - minLen < 32)
     {
         return LIBBSC_NOT_COMPRESSIBLE;
     }
