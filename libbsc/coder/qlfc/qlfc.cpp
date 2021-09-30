@@ -1021,6 +1021,11 @@ int QLFC_FAST_ENCODE_FUNCTION_NAME (const unsigned char * RESTRICT input, unsign
 
     for (; ranks < ranksEnd; )
     {
+        if (coder.CheckEOB())
+        {
+            return LIBBSC_NOT_COMPRESSIBLE;
+        }
+
         unsigned int currentRank = *ranks++;
         unsigned int currentChar = *input;
         unsigned int currentRun;

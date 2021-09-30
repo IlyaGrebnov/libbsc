@@ -58,7 +58,7 @@ template<class T> int bsc_lzp_encode_small(const unsigned char * RESTRICT input,
     const unsigned char *   inputMinLenEnd  = inputEnd - sizeof(T) - 32;
 
     const unsigned char *   outputStart     = output;
-    const unsigned char *   outputEOB       = outputEnd - 4;
+    const unsigned char *   outputEOB       = outputEnd - 8;
 
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
@@ -131,7 +131,7 @@ LIBBSC_LZP_BAD_MATCH_FOUND1:
     }
     
     {
-        unsigned int context = output[-1] | (output[-2] << 8) | (output[-3] << 16) | (output[-4] << 24);
+        unsigned int context = input[-1] | (input[-2] << 8) | (input[-3] << 16) | (input[-4] << 24);
 
         while ((input < inputEnd) && (output < outputEOB))
         {
@@ -152,7 +152,7 @@ template<class T> int bsc_lzp_encode_small2x(const unsigned char * RESTRICT inpu
     const unsigned char *   inputMinLenEnd  = inputEnd - sizeof(T) - sizeof(T) - 32;
 
     const unsigned char *   outputStart     = output;
-    const unsigned char *   outputEOB       = outputEnd - 4;
+    const unsigned char *   outputEOB       = outputEnd - 8;
 
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
@@ -225,7 +225,7 @@ LIBBSC_LZP_BAD_MATCH_FOUND1:
     }
     
     {
-        unsigned int context = output[-1] | (output[-2] << 8) | (output[-3] << 16) | (output[-4] << 24);
+        unsigned int context = input[-1] | (input[-2] << 8) | (input[-3] << 16) | (input[-4] << 24);
 
         while ((input < inputEnd) && (output < outputEOB))
         {
@@ -246,7 +246,7 @@ template<class T> int bsc_lzp_encode_medium(const unsigned char * RESTRICT input
     const unsigned char *   inputMinLenEnd  = inputEnd - sizeof(T) - sizeof(T) - 32;
 
     const unsigned char *   outputStart     = output;
-    const unsigned char *   outputEOB       = outputEnd - 4;
+    const unsigned char *   outputEOB       = outputEnd - 8;
 
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
@@ -319,7 +319,7 @@ LIBBSC_LZP_BAD_MATCH_FOUND1:
     }
     
     {
-        unsigned int context = output[-1] | (output[-2] << 8) | (output[-3] << 16) | (output[-4] << 24);
+        unsigned int context = input[-1] | (input[-2] << 8) | (input[-3] << 16) | (input[-4] << 24);
 
         while ((input < inputEnd) && (output < outputEOB))
         {
@@ -338,7 +338,7 @@ template<class T> int bsc_lzp_encode_large(const unsigned char * RESTRICT input,
 {
     const unsigned char *   inputStart  = input;
     const unsigned char *   outputStart = output;
-    const unsigned char *   outputEOB   = outputEnd - 4;
+    const unsigned char *   outputEOB   = outputEnd - 8;
 
     const unsigned char * heuristic      = input;
     const unsigned char * inputMinLenEnd = inputEnd - minLen - 32;
@@ -421,7 +421,7 @@ LIBBSC_LZP_BAD_MATCH_FOUND1:
     }
     
     {
-        unsigned int context = output[-1] | (output[-2] << 8) | (output[-3] << 16) | (output[-4] << 24);
+        unsigned int context = input[-1] | (input[-2] << 8) | (input[-3] << 16) | (input[-4] << 24);
 
         while ((input < inputEnd) && (output < outputEOB))
         {
@@ -442,7 +442,7 @@ int bsc_lzp_encode_generic(const unsigned char * RESTRICT input, const unsigned 
 {
     const unsigned char *   inputStart  = input;
     const unsigned char *   outputStart = output;
-    const unsigned char *   outputEOB   = outputEnd - 4;
+    const unsigned char *   outputEOB   = outputEnd - 8;
 
     const unsigned char * heuristic      = input;
     const unsigned char * inputMinLenEnd = inputEnd - minLen - 32;
@@ -450,7 +450,7 @@ int bsc_lzp_encode_generic(const unsigned char * RESTRICT input, const unsigned 
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
     {
-        unsigned int context = output[-1] | (output[-2] << 8) | (output[-3] << 16) | (output[-4] << 24);
+        unsigned int context = input[-1] | (input[-2] << 8) | (input[-3] << 16) | (input[-4] << 24);
 
         while ((input < inputMinLenEnd) && (output < outputEOB))
         {
@@ -515,7 +515,7 @@ LIBBSC_LZP_MATCH_NOT_FOUND:
     }
     
     {
-        unsigned int context = output[-1] | (output[-2] << 8) | (output[-3] << 16) | (output[-4] << 24);
+        unsigned int context = input[-1] | (input[-2] << 8) | (input[-3] << 16) | (input[-4] << 24);
 
         while ((input < inputEnd) && (output < outputEOB))
         {
@@ -577,7 +577,7 @@ int bsc_lzp_decode_block(const unsigned char * RESTRICT input, const unsigned ch
         {
             unsigned int prev4 = *(unsigned int *)(output - 4);
 
-            while (input < inputEnd - 4)
+            while (input < inputEnd - 8)
             {
                 unsigned int next4          = *(unsigned int *)(output) = *(unsigned int *)(input);
                 unsigned long long next8    = bsc_byteswap_uint64(((unsigned long long)next4 << 32) | prev4);

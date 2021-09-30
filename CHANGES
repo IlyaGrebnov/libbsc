@@ -1,3 +1,8 @@
+Changes in 3.2.3 (September, 30 2021)
+- Fixed various out-of-bound memory access bugs found by LibFuzzer.
+- Fixed data corruption issue found by LibFuzzer.
+- Due to these fixes, an upgrade to this version is strongly recommended.
+
 Changes in 3.2.2 (September, 18 2021)
 - Improved performance of LZP algorithm.
 
