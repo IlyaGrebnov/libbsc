@@ -43,7 +43,7 @@ See also the bsc and libbsc web site:
   SIZE_T g_LargePageSize = 0;
 #endif
 
-#if (LIBBSC_CPU_FEATURE != LIBBSC_CPU_FEATURE_NONE)
+#if (LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE2)
 
 #if defined(_MSC_VER)
     #include <intrin.h>

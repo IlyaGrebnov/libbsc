@@ -254,6 +254,145 @@ unsigned char * QLFC_TRANSFORM_FUNCTION_NAME (const unsigned char * RESTRICT inp
     return buffer + j;
 }
 
+#elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_A64
+
+INLINE ptrdiff_t QLFC_TRANSFORM_SCAN_FUNCTION_NAME (const unsigned char * RESTRICT input, ptrdiff_t i, unsigned long long currentChar)
+{
+    unsigned long long v = currentChar; v |= (v << 8); v |= (v << 16); v |= (v << 32);
+
+    while (i >= 8)
+    {
+        i -= 8; unsigned long long m = (*(unsigned long long const *)(input + i)) ^ v;
+        if (m != 0) { return i + (bsc_bit_scan_reverse64(m) / 8); }
+    }
+
+    do {} while ((--i >= 0) && (input[i] == currentChar)); return i;
+}
+
+unsigned char * QLFC_TRANSFORM_FUNCTION_NAME (const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
+{
+    signed char ALIGNED(64) ranks[ALPHABET_SIZE];
+    signed char ALIGNED(64) flags[ALPHABET_SIZE];
+
+    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { ranks[i] = (signed char)(i - 128); }
+    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { flags[i] = 0; }
+
+    ptrdiff_t i = (ptrdiff_t)n - 1, j = n; signed char nSymbols = 0;
+
+    for (; i >= 0;)
+    {
+        unsigned char currentChar1 = input[i]; i = QLFC_TRANSFORM_SCAN_FUNCTION_NAME(input, i, currentChar1); if (i < 0) { i = 0; break; }
+        unsigned char currentChar2 = input[i]; i = QLFC_TRANSFORM_SCAN_FUNCTION_NAME(input, i, currentChar2);
+
+        signed char rank1 = ranks[currentChar1], rank2 = ranks[currentChar2]; rank2 += rank1 > rank2;
+
+        buffer[--j] = rank1 + 128; if (flags[currentChar1] == 0) { flags[currentChar1] = 1; buffer[j] = nSymbols++; }
+        buffer[--j] = rank2 + 128; if (flags[currentChar2] == 0) { flags[currentChar2] = 1; buffer[j] = nSymbols++; }
+
+        int8x16_t r1 = vdupq_n_s8(rank1), r2 = vdupq_n_s8(rank2), x, y;
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 0)); y = vld1q_s8((int8_t const *)(ranks + 16 * 1));
+        x = vsubq_s8(vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r1, x))), vreinterpretq_s8_u8(vcgtq_s8(r2, x)));
+        y = vsubq_s8(vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r1, y))), vreinterpretq_s8_u8(vcgtq_s8(r2, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 0), x); vst1q_s8((int8_t *)(ranks + 16 * 1), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 2)); y = vld1q_s8((int8_t const *)(ranks + 16 * 3));
+        x = vsubq_s8(vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r1, x))), vreinterpretq_s8_u8(vcgtq_s8(r2, x)));
+        y = vsubq_s8(vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r1, y))), vreinterpretq_s8_u8(vcgtq_s8(r2, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 2), x); vst1q_s8((int8_t *)(ranks + 16 * 3), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 4)); y = vld1q_s8((int8_t const *)(ranks + 16 * 5));
+        x = vsubq_s8(vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r1, x))), vreinterpretq_s8_u8(vcgtq_s8(r2, x)));
+        y = vsubq_s8(vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r1, y))), vreinterpretq_s8_u8(vcgtq_s8(r2, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 4), x); vst1q_s8((int8_t *)(ranks + 16 * 5), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 6)); y = vld1q_s8((int8_t const *)(ranks + 16 * 7));
+        x = vsubq_s8(vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r1, x))), vreinterpretq_s8_u8(vcgtq_s8(r2, x)));
+        y = vsubq_s8(vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r1, y))), vreinterpretq_s8_u8(vcgtq_s8(r2, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 6), x); vst1q_s8((int8_t *)(ranks + 16 * 7), y);      
+       
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 8)); y = vld1q_s8((int8_t const *)(ranks + 16 * 9));
+        x = vsubq_s8(vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r1, x))), vreinterpretq_s8_u8(vcgtq_s8(r2, x)));
+        y = vsubq_s8(vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r1, y))), vreinterpretq_s8_u8(vcgtq_s8(r2, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 8), x); vst1q_s8((int8_t *)(ranks + 16 * 9), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 10)); y = vld1q_s8((int8_t const *)(ranks + 16 * 11));
+        x = vsubq_s8(vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r1, x))), vreinterpretq_s8_u8(vcgtq_s8(r2, x)));
+        y = vsubq_s8(vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r1, y))), vreinterpretq_s8_u8(vcgtq_s8(r2, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 10), x); vst1q_s8((int8_t *)(ranks + 16 * 11), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 12)); y = vld1q_s8((int8_t const *)(ranks + 16 * 13));
+        x = vsubq_s8(vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r1, x))), vreinterpretq_s8_u8(vcgtq_s8(r2, x)));
+        y = vsubq_s8(vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r1, y))), vreinterpretq_s8_u8(vcgtq_s8(r2, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 12), x); vst1q_s8((int8_t *)(ranks + 16 * 13), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 14)); y = vld1q_s8((int8_t const *)(ranks + 16 * 15));
+        x = vsubq_s8(vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r1, x))), vreinterpretq_s8_u8(vcgtq_s8(r2, x)));
+        y = vsubq_s8(vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r1, y))), vreinterpretq_s8_u8(vcgtq_s8(r2, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 14), x); vst1q_s8((int8_t *)(ranks + 16 * 15), y);
+
+        ranks[currentChar1] = -127; ranks[currentChar2] = -128;
+    }
+
+    if (i >= 0)
+    {
+        unsigned char currentChar = input[0]; signed char rank = ranks[currentChar];
+
+        buffer[--j] = rank + 128; if (flags[currentChar] == 0) { flags[currentChar] = 1; buffer[j] = nSymbols++; }
+
+        int8x16_t r = vdupq_n_s8(rank), x, y;
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 0)); y = vld1q_s8((int8_t const *)(ranks + 16 * 1));
+        x = vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r, x)));
+        y = vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 0), x); vst1q_s8((int8_t *)(ranks + 16 * 1), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 2)); y = vld1q_s8((int8_t const *)(ranks + 16 * 3));
+        x = vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r, x)));
+        y = vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 2), x); vst1q_s8((int8_t *)(ranks + 16 * 3), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 4)); y = vld1q_s8((int8_t const *)(ranks + 16 * 5));
+        x = vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r, x)));
+        y = vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 4), x); vst1q_s8((int8_t *)(ranks + 16 * 5), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 6)); y = vld1q_s8((int8_t const *)(ranks + 16 * 7));
+        x = vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r, x)));
+        y = vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 6), x); vst1q_s8((int8_t *)(ranks + 16 * 7), y);
+       
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 8)); y = vld1q_s8((int8_t const *)(ranks + 16 * 9));
+        x = vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r, x)));
+        y = vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 8), x); vst1q_s8((int8_t *)(ranks + 16 * 9), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 10)); y = vld1q_s8((int8_t const *)(ranks + 16 * 11));
+        x = vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r, x)));
+        y = vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 10), x); vst1q_s8((int8_t *)(ranks + 16 * 11), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 12)); y = vld1q_s8((int8_t const *)(ranks + 16 * 13));
+        x = vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r, x)));
+        y = vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 12), x); vst1q_s8((int8_t *)(ranks + 16 * 13), y);
+
+        x = vld1q_s8((int8_t const *)(ranks + 16 * 14)); y = vld1q_s8((int8_t const *)(ranks + 16 * 15));
+        x = vsubq_s8(x, vreinterpretq_s8_u8(vcgtq_s8(r, x)));
+        y = vsubq_s8(y, vreinterpretq_s8_u8(vcgtq_s8(r, y)));
+        vst1q_s8((int8_t *)(ranks + 16 * 14), x); vst1q_s8((int8_t *)(ranks + 16 * 15), y);
+
+        ranks[currentChar] = -128;
+    }
+
+    buffer[n - 1] = 1;
+
+    for (ptrdiff_t i = 0; i < ALPHABET_SIZE; ++i) { MTFTable[ranks[i] + 128] = (unsigned char)i; }
+    for (ptrdiff_t i = 1; i < ALPHABET_SIZE; ++i) { if (flags[MTFTable[i]] == 0) { MTFTable[i] = MTFTable[i - 1]; break; } }
+
+    return buffer + j;
+}
+
 #else
 
 unsigned char * QLFC_TRANSFORM_FUNCTION_NAME (const unsigned char * RESTRICT input, unsigned char * RESTRICT buffer, int n, unsigned char * RESTRICT MTFTable)
@@ -418,6 +557,20 @@ int QLFC_ADAPTIVE_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned ch
                    }
 
                    input += 16;
+                }
+#elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_A64
+                unsigned long long v = currentChar; v |= (v << 8); v |= (v << 16); v |= (v << 32);
+
+                while (true)
+                {
+                    unsigned long long m = (*(unsigned long long const *)input) ^ v;
+                    if (m != 0)
+                    {
+                        input += bsc_bit_scan_forward64(m) / 8;
+                        break;
+                    }
+
+                    input += 8;
                 }
 #else
                 while (*input == currentChar) { input++; }
@@ -771,6 +924,20 @@ int QLFC_STATIC_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned char
 
                    input += 16;
                 }
+#elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_A64
+                unsigned long long v = currentChar; v |= (v << 8); v |= (v << 16); v |= (v << 32);
+
+                while (true)
+                {
+                    unsigned long long m = (*(unsigned long long const *)input) ^ v;
+                    if (m != 0)
+                    {
+                        input += bsc_bit_scan_forward64(m) / 8;
+                        break;
+                    }
+
+                    input += 8;
+                }
 #else
                 while (*input == currentChar) { input++; }
 #endif
@@ -1048,6 +1215,20 @@ int QLFC_FAST_ENCODE_FUNCTION_NAME (const unsigned char * RESTRICT input, unsign
                    }
 
                    input += 16;
+                }
+#elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_A64
+                unsigned long long v = currentChar; v |= (v << 8); v |= (v << 16); v |= (v << 32);
+
+                while (true)
+                {
+                    unsigned long long m = (*(unsigned long long const *)input) ^ v;
+                    if (m != 0)
+                    {
+                        input += bsc_bit_scan_forward64(m) / 8;
+                        break;
+                    }
+
+                    input += 8;
                 }
 #else
                 while (*input == currentChar) { input++; }
