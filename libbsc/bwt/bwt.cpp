@@ -44,18 +44,39 @@ int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * 
 {
     if (int * RESTRICT A = (int *)bsc_malloc(n * sizeof(int)))
     {
-        int mod = n / 8;
+        int index;
+
+        if (num_indexes != NULL && indexes != NULL)
         {
-            mod |= mod >> 1;  mod |= mod >> 2;
-            mod |= mod >> 4;  mod |= mod >> 8;
-            mod |= mod >> 16; mod >>= 1;
-        }
+            int I[256];
+
+            int mod = n / 8;
+            {
+                mod |= mod >> 1;  mod |= mod >> 2;
+                mod |= mod >> 4;  mod |= mod >> 8;
+                mod |= mod >> 16; mod >>= 1;
+            }
 
 #ifdef LIBBSC_OPENMP
-        int index = libsais_bwt_aux_omp(T, T, A, n, 0, NULL, mod + 1, indexes, (features & LIBBSC_FEATURE_MULTITHREADING) > 0 ? 0 : 1);
+            index = libsais_bwt_aux_omp(T, T, A, n, 0, NULL, mod + 1, I, (features & LIBBSC_FEATURE_MULTITHREADING) > 0 ? 0 : 1);
 #else
-        int index = libsais_bwt_aux(T, T, A, n, 0, NULL, mod + 1, indexes);
+            index = libsais_bwt_aux(T, T, A, n, 0, NULL, mod + 1, I);
 #endif
+
+            if (index == 0)
+            {
+                num_indexes[0] = (unsigned char)((n - 1) / (mod + 1));
+                index = I[0]; for (int t = 0; t < num_indexes[0]; ++t) indexes[t] = I[t + 1] - 1;
+            }
+        }
+        else
+        {
+#ifdef LIBBSC_OPENMP
+            index = libsais_bwt_omp(T, T, A, n, 0, NULL, (features & LIBBSC_FEATURE_MULTITHREADING) > 0 ? 0 : 1);
+#else
+            index = libsais_bwt(T, T, A, n, 0, NULL);
+#endif
+        }
 
         bsc_free(A);
 
@@ -64,9 +85,6 @@ int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * 
             case -1 : return LIBBSC_BAD_PARAMETER;
             case -2 : return LIBBSC_NOT_ENOUGH_MEMORY;
         }
-
-        num_indexes[0] = (unsigned char)((n - 1) / (mod + 1));
-        index = indexes[0]; for (int t = 0; t < num_indexes[0]; ++t) indexes[t] = indexes[t + 1] - 1;
 
         return index;
     }
