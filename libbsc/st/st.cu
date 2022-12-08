@@ -76,8 +76,7 @@ int bsc_st_cuda_init(int features)
 #endif
 
 #define CUDA_DEVICE_PADDING             1024
-#define CUDA_NUM_THREADS_IN_BLOCK       128
-#define CUDA_CTA_OCCUPANCY              8
+#define CUDA_NUM_THREADS_IN_BLOCK       256
 
 cudaError_t bsc_cuda_safe_call(const char * filename, int line, cudaError_t result, cudaError_t status = cudaSuccess)
 {
@@ -90,106 +89,70 @@ cudaError_t bsc_cuda_safe_call(const char * filename, int line, cudaError_t resu
     return result != cudaSuccess ? result : status;
 }
 
-__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY)
-void bsc_st567_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned long long * RESTRICT K_device, int n)
+__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK)
+void bsc_st567_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned long long * RESTRICT K_device)
+{
+    __shared__ unsigned int staging[1 + CUDA_NUM_THREADS_IN_BLOCK + 6];
+
+    unsigned int * RESTRICT thread_staging = &staging[threadIdx.x];
+    {
+        int index = blockIdx.x * CUDA_NUM_THREADS_IN_BLOCK + threadIdx.x;
+
+        {
+                                 thread_staging[0                        ] = T_device[index - 1                            ];
+            if (threadIdx.x < 7) thread_staging[CUDA_NUM_THREADS_IN_BLOCK] = T_device[index - 1 + CUDA_NUM_THREADS_IN_BLOCK];
+
+            __syncthreads();
+        }
+
+        {
+            unsigned int lo = __byte_perm(thread_staging[4], thread_staging[5], 0x0411) | __byte_perm(thread_staging[6], thread_staging[7], 0x1104);
+            unsigned int hi = __byte_perm(thread_staging[0], thread_staging[1], 0x0411) | __byte_perm(thread_staging[2], thread_staging[3], 0x1104);
+
+            K_device[index] = (((unsigned long long)hi) << 32) | ((unsigned long long)lo);
+        }
+    }
+}
+
+__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK)
+void bsc_st8_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned long long * RESTRICT K_device, unsigned char * RESTRICT V_device)
 {
     __shared__ unsigned int staging[1 + CUDA_NUM_THREADS_IN_BLOCK + 7];
 
     unsigned int * RESTRICT thread_staging = &staging[threadIdx.x];
-    for (int grid_size = gridDim.x * CUDA_NUM_THREADS_IN_BLOCK, block_start = blockIdx.x * CUDA_NUM_THREADS_IN_BLOCK; block_start < n; block_start += grid_size)
     {
-        int index = block_start + threadIdx.x;
+        int index = blockIdx.x * CUDA_NUM_THREADS_IN_BLOCK + threadIdx.x;
 
         {
-                                  thread_staging[1                            ] = T_device[index                            ];
-            if (threadIdx.x < 7 ) thread_staging[1 + CUDA_NUM_THREADS_IN_BLOCK] = T_device[index + CUDA_NUM_THREADS_IN_BLOCK]; else
-            if (threadIdx.x == 7) thread_staging[-7                           ] = T_device[index - 8                        ];
+                                 thread_staging[0                        ] = T_device[index - 1                            ];
+            if (threadIdx.x < 8) thread_staging[CUDA_NUM_THREADS_IN_BLOCK] = T_device[index - 1 + CUDA_NUM_THREADS_IN_BLOCK];
 
             __syncthreads();
         }
 
         {
-            #if CUDA_DEVICE_ARCH >= 200
-                unsigned int lo = __byte_perm(thread_staging[4], thread_staging[5], 0x0411) | __byte_perm(thread_staging[6], thread_staging[7], 0x1104);
-                unsigned int hi = __byte_perm(thread_staging[0], thread_staging[1], 0x0411) | __byte_perm(thread_staging[2], thread_staging[3], 0x1104);
-            #else
-                unsigned int lo = (thread_staging[4] << 24) | (thread_staging[5] << 16) | (thread_staging[6] << 8) | thread_staging[7];
-                unsigned int hi = (thread_staging[0] << 24) | (thread_staging[1] << 16) | (thread_staging[2] << 8) | thread_staging[3];
-            #endif
-
-            K_device[index] = (((unsigned long long)hi) << 32) | ((unsigned long long)lo);
-
-            __syncthreads();
-        }
-    }
-}
-
-__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY)
-void bsc_st8_encode_cuda_presort(unsigned char * RESTRICT T_device, unsigned long long * RESTRICT K_device, unsigned char * RESTRICT V_device, int n)
-{
-    __shared__ unsigned int staging[1 + CUDA_NUM_THREADS_IN_BLOCK + 8];
-
-    unsigned int * RESTRICT thread_staging = &staging[threadIdx.x];
-    for (int grid_size = gridDim.x * CUDA_NUM_THREADS_IN_BLOCK, block_start = blockIdx.x * CUDA_NUM_THREADS_IN_BLOCK; block_start < n; block_start += grid_size)
-    {
-        int index = block_start + threadIdx.x;
-
-        {
-                                  thread_staging[1                            ] = T_device[index                            ];
-            if (threadIdx.x < 8 ) thread_staging[1 + CUDA_NUM_THREADS_IN_BLOCK] = T_device[index + CUDA_NUM_THREADS_IN_BLOCK]; else
-            if (threadIdx.x == 8) thread_staging[-8                           ] = T_device[index - 9                        ];
-
-            __syncthreads();
-        }
-
-        {
-            #if CUDA_DEVICE_ARCH >= 200
-                unsigned int lo = __byte_perm(thread_staging[5], thread_staging[6], 0x0411) | __byte_perm(thread_staging[7], thread_staging[8], 0x1104);
-                unsigned int hi = __byte_perm(thread_staging[1], thread_staging[2], 0x0411) | __byte_perm(thread_staging[3], thread_staging[4], 0x1104);
-            #else
-                unsigned int lo = (thread_staging[5] << 24) | (thread_staging[6] << 16) | (thread_staging[7] << 8) | thread_staging[8];
-                unsigned int hi = (thread_staging[1] << 24) | (thread_staging[2] << 16) | (thread_staging[3] << 8) | thread_staging[4];
-            #endif
+            unsigned int lo = __byte_perm(thread_staging[5], thread_staging[6], 0x0411) | __byte_perm(thread_staging[7], thread_staging[8], 0x1104);
+            unsigned int hi = __byte_perm(thread_staging[1], thread_staging[2], 0x0411) | __byte_perm(thread_staging[3], thread_staging[4], 0x1104);
 
             K_device[index] = (((unsigned long long)hi) << 32) | ((unsigned long long)lo); V_device[index] = thread_staging[0];
-
-            __syncthreads();
         }
     }
 }
 
-__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY)
-void bsc_st567_encode_cuda_postsort(unsigned char * RESTRICT T_device, unsigned long long * RESTRICT K_device, int n, unsigned long long lookup, int * RESTRICT I_device)
+__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK)
+void bsc_st567_encode_cuda_postsort(unsigned char * RESTRICT T_device, unsigned long long * RESTRICT K_device, unsigned long long lookup, int * RESTRICT I_device)
 {
-    int min_index = n;
-    for (int grid_size = gridDim.x * CUDA_NUM_THREADS_IN_BLOCK, block_start = blockIdx.x * CUDA_NUM_THREADS_IN_BLOCK; block_start < n; block_start += grid_size)
-    {
-        int index = block_start + threadIdx.x;
-        {
-            unsigned long long value = K_device[index];
-            {
-                if (value == lookup && index < min_index) min_index = index;
-                T_device[index] = (unsigned char)(value >> 56);
-            }
-        }
-    }
+    int index = blockIdx.x * CUDA_NUM_THREADS_IN_BLOCK + threadIdx.x;
+    if (K_device[index] == lookup) { atomicMin(I_device, index); }
 
-    __syncthreads(); if (min_index != n) atomicMin(I_device, min_index);
+    T_device[index] = (unsigned char)(K_device[index] >> 56);
 }
 
-__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK, CUDA_CTA_OCCUPANCY)
-void bsc_st8_encode_cuda_postsort(unsigned long long * RESTRICT K_device, int n, unsigned long long lookup, int * RESTRICT I_device)
+__global__ __launch_bounds__(CUDA_NUM_THREADS_IN_BLOCK)
+void bsc_st8_encode_cuda_postsort(unsigned long long * RESTRICT K_device, unsigned long long lookup, int * RESTRICT I_device)
 {
-    int min_index = n;
-    for (int grid_size = gridDim.x * CUDA_NUM_THREADS_IN_BLOCK, block_start = blockIdx.x * CUDA_NUM_THREADS_IN_BLOCK; block_start < n; block_start += grid_size)
-    {
-        int index = block_start + threadIdx.x;
-        {
-            if (K_device[index] == lookup && index < min_index) min_index = index;
-        }
-    }
-
-    __syncthreads(); if (min_index != n) atomicMin(I_device, min_index);
+    int index = blockIdx.x * CUDA_NUM_THREADS_IN_BLOCK + threadIdx.x;
+    if (K_device[index] == lookup) { atomicMin(I_device, index); }
 }
 
 int bsc_st567_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int num_blocks, int k)
@@ -204,7 +167,7 @@ int bsc_st567_encode_cuda(unsigned char * T, unsigned char * T_device, int n, in
             index              = LIBBSC_GPU_ERROR;
             cudaError_t status = cudaSuccess;
 
-            bsc_st567_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device, n);
+            bsc_st567_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device);
 
             if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
             {
@@ -242,7 +205,7 @@ int bsc_st567_encode_cuda(unsigned char * T, unsigned char * T_device, int n, in
 
                 if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                 {
-                    bsc_st567_encode_cuda_postsort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device_sorted, n, lookup, (int *)(T_device - sizeof(int)));
+                    bsc_st567_encode_cuda_postsort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device_sorted, lookup, (int *)(T_device - sizeof(int)));
 
                     status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFree(K_device), status);
 
@@ -260,6 +223,7 @@ int bsc_st567_encode_cuda(unsigned char * T, unsigned char * T_device, int n, in
                     return index;
                 }
             }
+
             cudaFree(K_device);
         }
     }
@@ -284,7 +248,7 @@ int bsc_st8_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int 
                 index              = LIBBSC_GPU_ERROR;
                 cudaError_t status = cudaSuccess;
 
-                bsc_st8_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device, V_device, n);
+                bsc_st8_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device, V_device);
 
                 if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                 {
@@ -325,7 +289,7 @@ int bsc_st8_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int 
 
                     if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                     {
-                        bsc_st8_encode_cuda_postsort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(K_device_sorted, n, lookup, (int *)(V_device_sorted + ((n + sizeof(int) - 1) / sizeof(int)) * sizeof(int)));
+                        bsc_st8_encode_cuda_postsort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(K_device_sorted, lookup, (int *)(V_device_sorted + ((n + sizeof(int) - 1) / sizeof(int)) * sizeof(int)));
 
                         if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                         {
@@ -343,8 +307,10 @@ int bsc_st8_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int 
                         return index;
                     }
                 }
+
                 cudaFree(K_device);
             }
+
             cudaFree(V_device);
         }
     }
@@ -370,10 +336,7 @@ int bsc_st_encode_cuda(unsigned char * T, int n, int k, int features)
 
         if (deviceProperties.major * 10 + deviceProperties.minor < 35) return LIBBSC_GPU_NOT_SUPPORTED;
 
-        num_blocks = CUDA_CTA_OCCUPANCY * deviceProperties.multiProcessorCount;
-
-        if (num_blocks > ((n + CUDA_NUM_THREADS_IN_BLOCK - 1) / CUDA_NUM_THREADS_IN_BLOCK)) num_blocks = (n + CUDA_NUM_THREADS_IN_BLOCK - 1) / CUDA_NUM_THREADS_IN_BLOCK;
-        if (num_blocks <= 0) num_blocks = 1;
+        num_blocks = (n + CUDA_NUM_THREADS_IN_BLOCK - 1) / CUDA_NUM_THREADS_IN_BLOCK;
     }
 
     #ifdef LIBBSC_OPENMP
