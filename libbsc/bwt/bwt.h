@@ -38,6 +38,13 @@ extern "C" {
 #endif
 
     /**
+    * You should call this function before you call any of the other functions in bwt.
+    * @param features       - the set of additional features.
+    * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
+    */
+    int bsc_bwt_init(int features);
+
+    /**
     * Constructs the burrows wheeler transformed string of a given string.
     * @param T              - the input/output string of n chars.
     * @param n              - the length of the given string.

@@ -38,14 +38,149 @@ See also the bsc and libbsc web site:
 #include "../platform/platform.h"
 #include "../libbsc.h"
 
+#include "libcubwt/libcubwt.cuh"
 #include "libsais/libsais.h"
+
+#if defined(LIBBSC_CUDA_SUPPORT) && defined(LIBBSC_OPENMP)
+
+omp_lock_t bwt_cuda_lock;
+void *     bwt_cuda_device_storage = NULL;
+int        bwt_cuda_device_storage_size = 0;
+
+int bsc_bwt_init(int features)
+{
+    if (features & LIBBSC_FEATURE_CUDA)
+    {
+        omp_init_lock(&bwt_cuda_lock);
+    }
+
+    return LIBBSC_NO_ERROR;
+}
+
+#else
+
+int bsc_bwt_init(int features)
+{
+    return LIBBSC_NO_ERROR;
+}
+
+#endif
+
+int bsc_bwt_gpu_encode(unsigned char * T, int n, unsigned char * num_indexes, int * indexes, int features)
+{
+    int index = -1;
+
+    if (features & LIBBSC_FEATURE_CUDA)
+    {
+#ifdef LIBBSC_CUDA_SUPPORT
+        if (num_indexes != NULL && indexes != NULL)
+        {
+            int I[256];
+
+            int mod = n / 8;
+            {
+                mod |= mod >> 1;  mod |= mod >> 2;
+                mod |= mod >> 4;  mod |= mod >> 8;
+                mod |= mod >> 16; mod >>= 1;
+            }
+
+#ifdef LIBBSC_OPENMP
+            omp_set_lock(&bwt_cuda_lock);
+
+            if (bwt_cuda_device_storage_size < n)
+            {
+                if (bwt_cuda_device_storage != NULL)
+                {
+                    libcubwt_free_device_storage(bwt_cuda_device_storage);
+
+                    bwt_cuda_device_storage = NULL;
+                    bwt_cuda_device_storage_size = 0;
+                }
+
+                if (libcubwt_allocate_device_storage(&bwt_cuda_device_storage, n + (n / 32)) == LIBCUBWT_NO_ERROR)
+                {
+                    bwt_cuda_device_storage_size = n + (n / 32);
+                }
+            }
+
+            if (bwt_cuda_device_storage_size >= n)
+            {
+                index = (int)libcubwt_bwt_aux(bwt_cuda_device_storage, T, T, n, mod + 1, (unsigned int *)I);
+            } 
+
+            omp_unset_lock(&bwt_cuda_lock);
+#else
+            void * bwt_cuda_device_storage = NULL;
+
+            if (libcubwt_allocate_device_storage(&bwt_cuda_device_storage, n) == LIBCUBWT_NO_ERROR)
+            {
+                index = (int)libcubwt_bwt_aux(bwt_cuda_device_storage, T, T, n, mod + 1, (unsigned int *)I);
+
+                libcubwt_free_device_storage(bwt_cuda_device_storage);
+            }
+#endif
+
+            if (index == 0)
+            {
+                num_indexes[0] = (unsigned char)((n - 1) / (mod + 1));
+                index = I[0]; for (int t = 0; t < num_indexes[0]; ++t) indexes[t] = I[t + 1] - 1;
+            }
+        }
+        else
+        {
+#ifdef LIBBSC_OPENMP
+            omp_set_lock(&bwt_cuda_lock);
+
+            if (bwt_cuda_device_storage_size < n)
+            {
+                if (bwt_cuda_device_storage != NULL)
+                {
+                    libcubwt_free_device_storage(bwt_cuda_device_storage);
+
+                    bwt_cuda_device_storage = NULL;
+                    bwt_cuda_device_storage_size = 0;
+                }
+
+                if (libcubwt_allocate_device_storage(&bwt_cuda_device_storage, n + (n / 32)) == LIBCUBWT_NO_ERROR)
+                {
+                    bwt_cuda_device_storage_size = n + (n / 32);
+                }
+            }
+
+            if (bwt_cuda_device_storage_size >= n)
+            {
+                index = (int)libcubwt_bwt(bwt_cuda_device_storage, T, T, n);
+            } 
+
+            omp_unset_lock(&bwt_cuda_lock);
+#else
+            void * bwt_cuda_device_storage = NULL;
+
+            if (libcubwt_allocate_device_storage(&bwt_cuda_device_storage, n) == LIBCUBWT_NO_ERROR)
+            {
+                index = (int)libcubwt_bwt(bwt_cuda_device_storage, T, T, n);
+
+                libcubwt_free_device_storage(bwt_cuda_device_storage);
+            }
+#endif
+        }
+#endif
+    }
+
+    return index;
+}
+
 
 int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * indexes, int features)
 {
+    int index = bsc_bwt_gpu_encode(T, n, num_indexes, indexes, features);
+    if (index >= 0)
+    {
+        return index;
+    }
+
     if (int * RESTRICT A = (int *)bsc_malloc(n * sizeof(int)))
     {
-        int index;
-
         if (num_indexes != NULL && indexes != NULL)
         {
             int I[256];

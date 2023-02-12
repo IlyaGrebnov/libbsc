@@ -33,6 +33,11 @@ See also the bsc and libbsc web site:
 #ifndef _LIBBSC_LIBBSC_H
 #define _LIBBSC_LIBBSC_H
 
+#define LIBBSC_VERSION_MAJOR           3
+#define LIBBSC_VERSION_MINOR           3
+#define LIBBSC_VERSION_PATCH           0
+#define LIBBSC_VERSION_STRING          "3.3.0"
+
 #define LIBBSC_NO_ERROR                0
 #define LIBBSC_BAD_PARAMETER          -1
 #define LIBBSC_NOT_ENOUGH_MEMORY      -2
@@ -70,7 +75,7 @@ See also the bsc and libbsc web site:
 #define LIBBSC_FEATURE_LARGEPAGES      4
 #define LIBBSC_FEATURE_CUDA            8
 
-#define LIBBSC_DEFAULT_LZPHASHSIZE     16
+#define LIBBSC_DEFAULT_LZPHASHSIZE     15
 #define LIBBSC_DEFAULT_LZPMINLEN       128
 #define LIBBSC_DEFAULT_BLOCKSORTER     LIBBSC_BLOCKSORTER_BWT
 #define LIBBSC_DEFAULT_CODER           LIBBSC_CODER_QLFC_STATIC

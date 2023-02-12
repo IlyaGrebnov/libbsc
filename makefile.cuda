@@ -1,8 +1,9 @@
 SHELL = /bin/sh
 
 CUDA_PATH = /usr/local/cuda
-CUDA_INCLUDE_PATH = $(CUDA_PATH)/include
 CUDA_BIN_PATH = $(CUDA_PATH)/bin
+CUDA_LIB_PATH = $(CUDA_PATH)/lib64
+CUDA_INCLUDE_PATH = $(CUDA_PATH)/include
 
 NVCC = $(CUDA_BIN_PATH)/nvcc
 NVCCFLAGS = -m64 -O3 -Xcompiler=-fopenmp -arch=all -Wno-deprecated-gpu-targets -I $(CUDA_INCLUDE_PATH)
@@ -46,7 +47,6 @@ PREFIX = /usr
 OBJS = \
        adler32.o       \
        libsais.o       \
-       bwt.o           \
        coder.o         \
        qlfc.o          \
        qlfc_model.o    \
@@ -55,13 +55,15 @@ OBJS = \
        libbsc.o        \
        lzp.o           \
        platform.o      \
-       st.cpu.o        \
-       st.gpu.o        \
+       st.o            \
+       bwt.o           \
+       st.cuda.o       \
+       bwt.cuda.o      \
 
 all: libbsc.a bsc
 
 bsc: libbsc.a bsc.cpp
-	$(CC) $(CFLAGS) bsc.cpp -o bsc -L. -lbsc -lcudart
+	$(CC) $(CFLAGS) bsc.cpp -o bsc -L. -L$(CUDA_LIB_PATH) -lbsc -lcudart
 
 libbsc.a: $(OBJS)
 	rm -f libbsc.a
@@ -92,9 +94,6 @@ adler32.o: libbsc/adler32/adler32.cpp
 libsais.o: libbsc/bwt/libsais/libsais.c
 	$(CC) $(CFLAGS) -c libbsc/bwt/libsais/libsais.c
 
-bwt.o: libbsc/bwt/bwt.cpp
-	$(CC) $(CFLAGS) -c libbsc/bwt/bwt.cpp
-
 coder.o: libbsc/coder/coder.cpp
 	$(CC) $(CFLAGS) -c libbsc/coder/coder.cpp
 
@@ -119,8 +118,14 @@ lzp.o: libbsc/lzp/lzp.cpp
 platform.o: libbsc/platform/platform.cpp
 	$(CC) $(CFLAGS) -c libbsc/platform/platform.cpp
 
-st.cpu.o: libbsc/st/st.cpp
-	$(CC) $(CFLAGS) -c libbsc/st/st.cpp -o st.cpu.o
+st.o: libbsc/st/st.cpp
+	$(CC) $(CFLAGS) -c libbsc/st/st.cpp
 
-st.gpu.o: libbsc/st/st.cu
-	$(NVCC) $(NVCCFLAGS) $(NVCCEXTRAFLAGS) -c libbsc/st/st.cu -o st.gpu.o
+bwt.o: libbsc/bwt/bwt.cpp
+	$(CC) $(CFLAGS) -c libbsc/bwt/bwt.cpp
+
+st.cuda.o: libbsc/st/st.cu
+	$(NVCC) $(NVCCFLAGS) $(NVCCEXTRAFLAGS) -c libbsc/st/st.cu -o st.cuda.o
+
+bwt.cuda.o: libbsc/bwt/libcubwt/libcubwt.cu
+	$(NVCC) $(NVCCFLAGS) $(NVCCEXTRAFLAGS) -c libbsc/bwt/libcubwt/libcubwt.cu -o bwt.cuda.o

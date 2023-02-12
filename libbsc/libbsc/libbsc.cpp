@@ -49,6 +49,7 @@ int bsc_init_full(int features, void* (* malloc)(size_t size), void* (* zero_mal
 
     if (result == LIBBSC_NO_ERROR) result = bsc_platform_init(features, malloc, zero_malloc, free);
     if (result == LIBBSC_NO_ERROR) result = bsc_coder_init(features);
+    if (result == LIBBSC_NO_ERROR) result = bsc_bwt_init(features);
 
 #ifdef LIBBSC_SORT_TRANSFORM_SUPPORT
 

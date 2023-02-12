@@ -53,10 +53,17 @@ See also the bsc and libbsc web site:
 
 #ifdef LIBBSC_OPENMP
 
-omp_lock_t cuda_lock;
+omp_lock_t      st_cuda_lock;
+cudaStream_t    st_cuda_stream;
+
 int bsc_st_cuda_init(int features)
 {
-    omp_init_lock(&cuda_lock);
+    if (features & LIBBSC_FEATURE_CUDA)
+    {
+        omp_init_lock(&st_cuda_lock);
+        st_cuda_stream = NULL;
+    }
+
     return LIBBSC_NO_ERROR;
 }
 
@@ -155,19 +162,19 @@ void bsc_st8_encode_cuda_postsort(unsigned long long * RESTRICT K_device, unsign
     if (K_device[index] == lookup) { atomicMin(I_device, index); }
 }
 
-int bsc_st567_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int num_blocks, int k)
+int bsc_st567_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int num_blocks, int k, cudaStream_t st_cuda_stream)
 {
     int index = LIBBSC_GPU_NOT_ENOUGH_MEMORY;
     {
         unsigned long long * K_device = NULL;
         unsigned long long * K_device_sorted = NULL;
 
-        if (bsc_cuda_safe_call(__FILE__, __LINE__, cudaMalloc((void **)&K_device, 2 * (n + 2 * CUDA_DEVICE_PADDING) * sizeof(unsigned long long))) == cudaSuccess)
+        if (bsc_cuda_safe_call(__FILE__, __LINE__, cudaMallocAsync((void **)&K_device, 2 * (n + 2 * CUDA_DEVICE_PADDING) * sizeof(unsigned long long), st_cuda_stream)) == cudaSuccess)
         {
             index              = LIBBSC_GPU_ERROR;
             cudaError_t status = cudaSuccess;
 
-            bsc_st567_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device);
+            bsc_st567_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK, 0, st_cuda_stream>>>(T_device, K_device);
 
             if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
             {
@@ -177,78 +184,81 @@ int bsc_st567_encode_cuda(unsigned char * T, unsigned char * T_device, int n, in
 
                 void * d_temp_storage = NULL; size_t temp_storage_bytes = 0;
 
-                status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortKeys(d_temp_storage, temp_storage_bytes, d_keys, n, (7 - k) * 8, 56), status);
+                status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortKeys(d_temp_storage, temp_storage_bytes, d_keys, n, (7 - k) * 8, 56, st_cuda_stream), status);
                 if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                 {
-                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMalloc(&d_temp_storage, temp_storage_bytes), status);
+                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMallocAsync(&d_temp_storage, temp_storage_bytes, st_cuda_stream), status);
                     if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                     {
-                       status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortKeys(d_temp_storage, temp_storage_bytes, d_keys, n, (7 - k) * 8, 56), status);
-                       status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFree(d_temp_storage), status);
+                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortKeys(d_temp_storage, temp_storage_bytes, d_keys, n, (7 - k) * 8, 56, st_cuda_stream), status);
+
+                        if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                        {
+                            K_device_sorted = d_keys.Current();
+
+                            unsigned long long lookup;
+                            {
+                                unsigned int lo = (T[3    ] << 24) | (T[4] << 16) | (T[5] << 8) | T[6];
+                                unsigned int hi = (T[n - 1] << 24) | (T[0] << 16) | (T[1] << 8) | T[2];
+
+                                lookup = (((unsigned long long)hi) << 32) | ((unsigned long long)lo);
+
+                                status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpyAsync(T_device - sizeof(int), &n, sizeof(int), cudaMemcpyHostToDevice, st_cuda_stream), status);
+                            }
+
+                            if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                            {
+                                bsc_st567_encode_cuda_postsort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK, 0, st_cuda_stream>>>(T_device, K_device_sorted, lookup, (int *)(T_device - sizeof(int)));
+
+                                if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                                {
+                                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpyAsync(T_device + n, T_device - sizeof(int), sizeof(int), cudaMemcpyDeviceToDevice, st_cuda_stream), status);
+                                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpyAsync(T, T_device, n + sizeof(int), cudaMemcpyDeviceToHost, st_cuda_stream), status);
+                                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaStreamSynchronize(st_cuda_stream), status);
+                                }
+
+                                status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFreeAsync(d_temp_storage, st_cuda_stream), status);
+                                status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFreeAsync(K_device, st_cuda_stream), status);
+
+                                if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                                {
+                                    index = *(int *)(T + n);
+                                }
+
+                                return index;
+                            }
+                        }
+
+                        cudaFreeAsync(d_temp_storage, st_cuda_stream);
                     }
                 }
-
-                K_device_sorted = d_keys.Current();
             }
 
-            if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
-            {
-                unsigned long long lookup;
-                {
-                    unsigned int lo = (T[3    ] << 24) | (T[4] << 16) | (T[5] << 8) | T[6];
-                    unsigned int hi = (T[n - 1] << 24) | (T[0] << 16) | (T[1] << 8) | T[2];
-
-                    lookup = (((unsigned long long)hi) << 32) | ((unsigned long long)lo);
-
-                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpy(T_device - sizeof(int), &n, sizeof(int), cudaMemcpyHostToDevice), status);
-                }
-
-                if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
-                {
-                    bsc_st567_encode_cuda_postsort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device_sorted, lookup, (int *)(T_device - sizeof(int)));
-
-                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFree(K_device), status);
-
-                    if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
-                    {
-                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpy(T_device + n, T_device - sizeof(int), sizeof(int), cudaMemcpyDeviceToDevice), status);
-                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpy(T, T_device, n + sizeof(int), cudaMemcpyDeviceToHost), status);
-                    }
-
-                    if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
-                    {
-                        index = *(int *)(T + n);
-                    }
-
-                    return index;
-                }
-            }
-
-            cudaFree(K_device);
+            cudaFreeAsync(K_device, st_cuda_stream);
         }
     }
 
     return index;
 }
 
-int bsc_st8_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int num_blocks)
+int bsc_st8_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int num_blocks, cudaStream_t st_cuda_stream)
 {
     int index = LIBBSC_GPU_NOT_ENOUGH_MEMORY;
     {
         unsigned char * V_device = NULL;
         unsigned char * V_device_sorted = NULL;
 
-        if (bsc_cuda_safe_call(__FILE__, __LINE__, cudaMalloc((void **)&V_device, 2 * (n + 2 * CUDA_DEVICE_PADDING) * sizeof(unsigned char))) == cudaSuccess)
+        if (bsc_cuda_safe_call(__FILE__, __LINE__, cudaMallocAsync((void **)&V_device, 2 * (n + 2 * CUDA_DEVICE_PADDING) * sizeof(unsigned char), st_cuda_stream)) == cudaSuccess)
         {
             unsigned long long * K_device = NULL;
             unsigned long long * K_device_sorted = NULL;
 
-            if (bsc_cuda_safe_call(__FILE__, __LINE__, cudaMalloc((void **)&K_device, 2 * (n + 2 * CUDA_DEVICE_PADDING) * sizeof(unsigned long long))) == cudaSuccess)
+            if (bsc_cuda_safe_call(__FILE__, __LINE__, cudaMallocAsync((void **)&K_device, 2 * (n + 2 * CUDA_DEVICE_PADDING) * sizeof(unsigned long long), st_cuda_stream)) == cudaSuccess)
             {
                 index              = LIBBSC_GPU_ERROR;
                 cudaError_t status = cudaSuccess;
 
-                bsc_st8_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(T_device, K_device, V_device);
+                bsc_st8_encode_cuda_presort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK, 0, st_cuda_stream>>>(T_device, K_device, V_device);
 
                 if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                 {
@@ -260,58 +270,61 @@ int bsc_st8_encode_cuda(unsigned char * T, unsigned char * T_device, int n, int 
 
                     void * d_temp_storage = NULL; size_t temp_storage_bytes = 0;
 
-                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, d_keys, d_values, n), status);
+                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, d_keys, d_values, n, 0, 64, st_cuda_stream), status);
                     if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                     {
-                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMalloc(&d_temp_storage, temp_storage_bytes), status);
+                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMallocAsync(&d_temp_storage, temp_storage_bytes, st_cuda_stream), status);
                         if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
                         {
-                           status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, d_keys, d_values, n), status);
-                           status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFree(d_temp_storage), status);
+                            status = bsc_cuda_safe_call(__FILE__, __LINE__, cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, d_keys, d_values, n, 0, 64, st_cuda_stream), status);
+
+                            if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                            {
+                                K_device_sorted = d_keys.Current();
+                                V_device_sorted = d_values.Current();
+
+                                unsigned long long lookup;
+                                {
+                                    unsigned int lo = (T[4] << 24) | (T[5] << 16) | (T[6] << 8) | T[7];
+                                    unsigned int hi = (T[0] << 24) | (T[1] << 16) | (T[2] << 8) | T[3];
+
+                                    lookup = (((unsigned long long)hi) << 32) | ((unsigned long long)lo);
+
+                                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpyAsync(V_device_sorted + ((n + sizeof(int) - 1) / sizeof(int)) * sizeof(int), &n, sizeof(int), cudaMemcpyHostToDevice, st_cuda_stream), status);
+                                }
+
+                                if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                                {
+                                    bsc_st8_encode_cuda_postsort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK, 0, st_cuda_stream>>>(K_device_sorted, lookup, (int *)(V_device_sorted + ((n + sizeof(int) - 1) / sizeof(int)) * sizeof(int)));
+
+                                    if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                                    {
+                                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpyAsync(T, V_device_sorted, n + 2 * sizeof(int), cudaMemcpyDeviceToHost, st_cuda_stream), status);
+                                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaStreamSynchronize(st_cuda_stream), status);
+                                    }
+
+                                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFreeAsync(d_temp_storage, st_cuda_stream), status);
+                                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFreeAsync(K_device, st_cuda_stream), status);
+                                    status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFreeAsync(V_device, st_cuda_stream), status);
+
+                                    if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
+                                    {
+                                        index = *(int *)(T + ((n + sizeof(int) - 1) / sizeof(int)) * sizeof(int));
+                                    }
+
+                                    return index;
+                                }
+                            }
+
+                            cudaFreeAsync(d_temp_storage, st_cuda_stream);
                         }
                     }
-
-                    K_device_sorted = d_keys.Current();
-                    V_device_sorted = d_values.Current();
                 }
 
-                if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
-                {
-                    unsigned long long lookup;
-                    {
-                        unsigned int lo = (T[4] << 24) | (T[5] << 16) | (T[6] << 8) | T[7];
-                        unsigned int hi = (T[0] << 24) | (T[1] << 16) | (T[2] << 8) | T[3];
-
-                        lookup = (((unsigned long long)hi) << 32) | ((unsigned long long)lo);
-
-                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpy(V_device_sorted + ((n + sizeof(int) - 1) / sizeof(int)) * sizeof(int), &n, sizeof(int), cudaMemcpyHostToDevice), status);
-                    }
-
-                    if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
-                    {
-                        bsc_st8_encode_cuda_postsort<<<num_blocks, CUDA_NUM_THREADS_IN_BLOCK>>>(K_device_sorted, lookup, (int *)(V_device_sorted + ((n + sizeof(int) - 1) / sizeof(int)) * sizeof(int)));
-
-                        if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
-                        {
-                            status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpy(T, V_device_sorted, n + 2 * sizeof(int), cudaMemcpyDeviceToHost), status);
-                        }
-
-                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFree(K_device), status);
-                        status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaFree(V_device), status);
-
-                        if (bsc_cuda_safe_call(__FILE__, __LINE__, status) == cudaSuccess)
-                        {
-                            index = *(int *)(T + ((n + sizeof(int) - 1) / sizeof(int)) * sizeof(int));
-                        }
-
-                        return index;
-                    }
-                }
-
-                cudaFree(K_device);
+                cudaFreeAsync(K_device, st_cuda_stream);
             }
 
-            cudaFree(V_device);
+            cudaFreeAsync(V_device, st_cuda_stream);
         }
     }
 
@@ -340,33 +353,48 @@ int bsc_st_encode_cuda(unsigned char * T, int n, int k, int features)
     }
 
     #ifdef LIBBSC_OPENMP
-        omp_set_lock(&cuda_lock);
+        omp_set_lock(&st_cuda_lock);
+    #else
+        cudaStream_t st_cuda_stream = NULL;
     #endif
+
+    if (st_cuda_stream == NULL)
+    {
+        if (bsc_cuda_safe_call(__FILE__, __LINE__, cudaStreamCreate(&st_cuda_stream)) != cudaSuccess)
+        {
+            st_cuda_stream = NULL;
+        }
+    }
 
     int index = LIBBSC_GPU_NOT_ENOUGH_MEMORY;
     {
         unsigned char * T_device = NULL;
-        if (cudaMalloc((void **)&T_device, n + 2 * CUDA_DEVICE_PADDING) == cudaSuccess)
+        if (st_cuda_stream != NULL && cudaMallocAsync((void **)&T_device, n + 2 * CUDA_DEVICE_PADDING, st_cuda_stream) == cudaSuccess)
         {
             index = LIBBSC_GPU_ERROR;
 
             cudaError_t status = cudaSuccess;
-            status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpy(T_device + CUDA_DEVICE_PADDING    , T                             , n                  , cudaMemcpyHostToDevice  ), status);
-            status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpy(T_device + CUDA_DEVICE_PADDING + n, T_device + CUDA_DEVICE_PADDING, CUDA_DEVICE_PADDING, cudaMemcpyDeviceToDevice), status);
-            status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpy(T_device                          , T_device + n                  , CUDA_DEVICE_PADDING, cudaMemcpyDeviceToDevice), status);
+            status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpyAsync(T_device + CUDA_DEVICE_PADDING    , T                             , n                  , cudaMemcpyHostToDevice  , st_cuda_stream), status);
+            status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpyAsync(T_device + CUDA_DEVICE_PADDING + n, T_device + CUDA_DEVICE_PADDING, CUDA_DEVICE_PADDING, cudaMemcpyDeviceToDevice, st_cuda_stream), status);
+            status = bsc_cuda_safe_call(__FILE__, __LINE__, cudaMemcpyAsync(T_device                          , T_device + n                  , CUDA_DEVICE_PADDING, cudaMemcpyDeviceToDevice, st_cuda_stream), status);
 
             if (status == cudaSuccess)
             {
-                if (k >= 5 && k <= 7) index = bsc_st567_encode_cuda(T, T_device + CUDA_DEVICE_PADDING, n, num_blocks, k);
-                if (k == 8)           index = bsc_st8_encode_cuda  (T, T_device + CUDA_DEVICE_PADDING, n, num_blocks   );
+                if (k >= 5 && k <= 7) index = bsc_st567_encode_cuda(T, T_device + CUDA_DEVICE_PADDING, n, num_blocks, k, st_cuda_stream);
+                if (k == 8)           index = bsc_st8_encode_cuda  (T, T_device + CUDA_DEVICE_PADDING, n, num_blocks   , st_cuda_stream);
             }
 
-            cudaFree(T_device);
+            cudaFreeAsync(T_device, st_cuda_stream);
         }
     }
 
     #ifdef LIBBSC_OPENMP
-        omp_unset_lock(&cuda_lock);
+        omp_unset_lock(&st_cuda_lock);
+    #else
+        if (st_cuda_stream != NULL)
+        {
+            bsc_cuda_safe_call(__FILE__, __LINE__, cudaStreamDestroy(st_cuda_stream));
+        }        
     #endif
 
     return index;

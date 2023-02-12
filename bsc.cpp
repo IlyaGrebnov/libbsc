@@ -851,8 +851,8 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.2.5. 23 November 2022.\n");
-    fprintf(stdout, "Copyright (c) 2009-2022 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.3.0. 10 February 2023.\n");
+    fprintf(stdout, "Copyright (c) 2009-2023 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)
 

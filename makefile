@@ -35,7 +35,6 @@ PREFIX = /usr
 OBJS = \
        adler32.o       \
        libsais.o       \
-       bwt.o           \
        coder.o         \
        qlfc.o          \
        qlfc_model.o    \
@@ -45,6 +44,7 @@ OBJS = \
        lzp.o           \
        platform.o      \
        st.o            \
+       bwt.o           \
 
 all: libbsc.a bsc
 
@@ -80,9 +80,6 @@ adler32.o: libbsc/adler32/adler32.cpp
 libsais.o: libbsc/bwt/libsais/libsais.c
 	$(CC) $(CFLAGS) -c libbsc/bwt/libsais/libsais.c
 
-bwt.o: libbsc/bwt/bwt.cpp
-	$(CC) $(CFLAGS) -c libbsc/bwt/bwt.cpp
-
 coder.o: libbsc/coder/coder.cpp
 	$(CC) $(CFLAGS) -c libbsc/coder/coder.cpp
 
@@ -109,3 +106,6 @@ platform.o: libbsc/platform/platform.cpp
 
 st.o: libbsc/st/st.cpp
 	$(CC) $(CFLAGS) -c libbsc/st/st.cpp
+
+bwt.o: libbsc/bwt/bwt.cpp
+	$(CC) $(CFLAGS) -c libbsc/bwt/bwt.cpp
