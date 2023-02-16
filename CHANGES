@@ -1,3 +1,6 @@
+Changes in 3.3.1 (February, 15 2023)
+- Added ability to specify block size in bytes as oppose to megabytes.
+
 Changes in 3.3.0 (February, 10 2023)
 - Improved GPU acceleration performance of forward ST algorithm.
 - Implemented GPU acceleration of forward Burrows–Wheeler transform.
