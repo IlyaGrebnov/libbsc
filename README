@@ -54,7 +54,7 @@ Compression and decompression requirements are the same and in bytes, can
 be estimated as 16Mb + 5 x block size x number of blocks processed in parallel.
 
 GPU memory usage for NVIDIA CUDA technology is different from CPU memory usage
-and can be estimated as 20 x block size for ST and 32 x block size for BWT.
+and can be estimated as 20 x block size for ST and 21 x block size for BWT.
 
 
 NVIDIA GPU acceleration:

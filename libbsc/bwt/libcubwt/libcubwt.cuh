@@ -1,7 +1,7 @@
 /*--
 
 This file is a part of libcubwt, a library for CUDA accelerated
-suffix array and burrows wheeler transform construction.
+burrows wheeler transform construction.
 
    Copyright (c) 2022-2023 Ilya Grebnov <ilya.grebnov@gmail.com>
 
@@ -25,9 +25,9 @@ Please see the file LICENSE for full copyright and license details.
 #define LIBCUBWT_CUH 1
 
 #define LIBCUBWT_VERSION_MAJOR          1
-#define LIBCUBWT_VERSION_MINOR          0
+#define LIBCUBWT_VERSION_MINOR          5
 #define LIBCUBWT_VERSION_PATCH          0
-#define LIBCUBWT_VERSION_STRING	        "1.0.0"
+#define LIBCUBWT_VERSION_STRING	        "1.5.0"
 
 #define LIBCUBWT_NO_ERROR               0
 #define LIBCUBWT_BAD_PARAMETER          -1
@@ -58,37 +58,6 @@ extern "C" {
     int64_t libcubwt_free_device_storage(void * device_storage);
 
     /**
-    * Constructs the suffix array (SA) of a given string.
-    * @param device_storage The previously allocated storage on the CUDA device.
-    * @param T [0..n-1] The input string.
-    * @param SA [0..n-1] The output array of suffixes.
-    * @param n The length of the input string.
-    * @return LIBCUBWT_NO_ERROR if no error occurred, libcubwt error code otherwise.
-    */
-    int64_t libcubwt_sa(void * device_storage, const uint8_t * T, uint32_t * SA, int64_t n);
-
-    /**
-    * Constructs the inverse suffix array (ISA) of a given string.
-    * @param device_storage The previously allocated storage on the CUDA device.
-    * @param T [0..n-1] The input string.
-    * @param ISA [0..n-1] The output inverse array of suffixes.
-    * @param n The length of the input string.
-    * @return LIBCUBWT_NO_ERROR if no error occurred, libcubwt error code otherwise.
-    */
-    int64_t libcubwt_isa(void * device_storage, const uint8_t * T, uint32_t * ISA, int64_t n);
-
-    /**
-    * Constructs the suffix array (SA) and inverse suffix array (ISA) of a given string.
-    * @param device_storage The previously allocated storage on the CUDA device.
-    * @param T [0..n-1] The input string.
-    * @param SA [0..n-1] The output array of suffixes.
-    * @param ISA [0..n-1] The output inverse array of suffixes.
-    * @param n The length of the input string.
-    * @return LIBCUBWT_NO_ERROR if no error occurred, libcubwt error code otherwise.
-    */
-    int64_t libcubwt_sa_isa(void * device_storage, const uint8_t * T, uint32_t * SA, uint32_t * ISA, int64_t n);
-
-    /**
     * Constructs the Burrows-Wheeler Transform (BWT) of a given string.
     * @param device_storage The previously allocated storage on the CUDA device.
     * @param T [0..n-1] The input string.
@@ -97,17 +66,6 @@ extern "C" {
     * @return The primary index if no error occurred, libcubwt error code otherwise.
     */
     int64_t libcubwt_bwt(void * device_storage, const uint8_t * T, uint8_t * L, int64_t n);
-
-    /**
-    * Constructs the Burrows-Wheeler Transform (BWT) and inverse suffix array (ISA) of a given string.
-    * @param device_storage The previously allocated storage on the CUDA device.
-    * @param T [0..n-1] The input string.
-    * @param L [0..n-1] The output string (can be T).
-    * @param ISA [0..n-1] The output inverse array of suffixes.
-    * @param n The length of the input string.
-    * @return The primary index if no error occurred, libcubwt error code otherwise.
-    */
-    int64_t libcubwt_bwt_isa(void * device_storage, const uint8_t * T, uint8_t * L, uint32_t * ISA, int64_t n);
 
     /**
     * Constructs the Burrows-Wheeler Transform (BWT) of a given string with auxiliary indexes.
