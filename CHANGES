@@ -1,3 +1,7 @@
+Changes in 3.3.3 (November, 26 2023)
+- Fixed out-of-bound memory access issue for large inputs.
+- Slightly improved compression performance.
+
 Changes in 3.3.2 (March, 24 2023)
 - Reduced memory usage and improved performance of GPU accelerated forward BWT.
 

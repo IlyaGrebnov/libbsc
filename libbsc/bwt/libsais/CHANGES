@@ -1,3 +1,6 @@
+Changes in 2.7.2 (April 18, 2023)
+- Fixed out-of-bound memory access issue for large inputs (libsais64).
+
 Changes in 2.7.1 (June 19, 2022)
 - Improved cache coherence for ARMv8 architecture.
 

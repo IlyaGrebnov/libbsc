@@ -757,8 +757,8 @@ void ProcessSwitch(char * s)
             case 'b':
             {
                 char * strNum = s; while ((*s >= '0') && (*s <= '9')) s++;
-                paramBlockSize = atoi(strNum); if (paramBlockSize < 100000) paramBlockSize *= 1024 * 1024;
-                if ((paramBlockSize < 100000) || (paramBlockSize > 2047 * 1024 * 1024)) ShowUsage();
+                paramBlockSize = atoi(strNum); if (paramBlockSize < 10000) paramBlockSize *= 1024 * 1024;
+                if ((paramBlockSize < 10000) || (paramBlockSize > 2047 * 1024 * 1024)) ShowUsage();
                 break;
             }
 
@@ -869,7 +869,7 @@ void ProcessCommandline(int argc, char * argv[])
 
 int main(int argc, char * argv[])
 {
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.3.2. 24 March 2023.\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version 3.3.3. 26 November 2023.\n");
     fprintf(stdout, "Copyright (c) 2009-2023 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
 #if defined(_OPENMP) && defined(__INTEL_COMPILER)

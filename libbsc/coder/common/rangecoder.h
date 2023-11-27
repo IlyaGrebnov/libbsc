@@ -80,7 +80,7 @@ private:
 #endif
     };
 
-    NOINLINE unsigned int ShiftLow()
+    NOINLINE unsigned int ShiftLowSlow()
     {
         if (ari.u.low32 < 0xffff0000U || ari.u.carry)
         {
@@ -95,6 +95,22 @@ private:
         ari.u.low32 <<= 16;
 
         return ari_range << 16;
+    }
+
+    NOINLINE unsigned int ShiftLow()
+    {
+        unsigned int ari_low32 = ari.u.low32;
+
+        if (!ari_ffnum && ari_low32 < 0xffff0000U)
+        {
+            OutputShort(ari_cache + ari.u.carry);
+
+            ari_cache = ari_low32 >> 16; ari.low = (unsigned int)(ari_low32 << 16);
+
+            return ari_range << 16;
+        }
+
+        return ShiftLowSlow();
     }
 
 public:
