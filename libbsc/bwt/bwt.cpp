@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-   Copyright (c) 2009-2021 Ilya Grebnov <ilya.grebnov@gmail.com>
+   Copyright (c) 2009-2024 Ilya Grebnov <ilya.grebnov@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -226,13 +226,63 @@ int bsc_bwt_encode(unsigned char * T, int n, unsigned char * num_indexes, int * 
     return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
+int bsc_bwt_gpu_decode(unsigned char * T, int n, int index, int features)
+{
+    int result = -1;
+
+#ifdef LIBBSC_CUDA_SUPPORT
+    if (features & LIBBSC_FEATURE_CUDA)
+    {
+        int storage_approx_length = (n / 3) | 0x1fffff;
+
+#ifdef LIBBSC_OPENMP
+        omp_set_lock(&bwt_cuda_lock);
+
+        if (bwt_cuda_device_storage_size < storage_approx_length)
+        {
+            if (bwt_cuda_device_storage != NULL)
+            {
+                libcubwt_free_device_storage(bwt_cuda_device_storage);
+
+                bwt_cuda_device_storage = NULL;
+                bwt_cuda_device_storage_size = 0;
+            }
+
+            if (libcubwt_allocate_device_storage(&bwt_cuda_device_storage, storage_approx_length + (storage_approx_length / 32)) == LIBCUBWT_NO_ERROR)
+            {
+                bwt_cuda_device_storage_size = storage_approx_length + (storage_approx_length / 32);
+            }
+        }
+
+        if (bwt_cuda_device_storage_size >= storage_approx_length)
+        {
+            result = (int)libcubwt_unbwt(bwt_cuda_device_storage, T, T, n, NULL, index);
+        } 
+
+        omp_unset_lock(&bwt_cuda_lock);
+#else
+        void * bwt_cuda_device_storage = NULL;
+
+        if (libcubwt_allocate_device_storage(&bwt_cuda_device_storage, storage_approx_length) == LIBCUBWT_NO_ERROR)
+        {
+            result = (int)libcubwt_unbwt(bwt_cuda_device_storage, T, T, n, NULL, index);
+
+            libcubwt_free_device_storage(bwt_cuda_device_storage);
+        }
+#endif
+    }
+#endif
+
+    return result;
+}
+
 int bsc_bwt_decode(unsigned char * T, int n, int index, unsigned char num_indexes, int * indexes, int features)
 {
     if ((T == NULL) || (n < 0) || (index <= 0) || (index > n))
     {
         return LIBBSC_BAD_PARAMETER;
     }
-    if (n <= 1)
+    if (n <= 1 || bsc_bwt_gpu_decode(T, n, index, features) == 0)
     {
         return LIBBSC_NO_ERROR;
     }
