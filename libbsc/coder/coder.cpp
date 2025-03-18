@@ -193,8 +193,13 @@ int bsc_coder_compress_parallel(const unsigned char * input, unsigned char * out
                     compressionResult[blockId] = bsc_coder_encode_block(input + blockStart, buffer + blockStart, blockSize, blockSize, coder);
                     if (compressionResult[blockId] < LIBBSC_NO_ERROR) compressionResult[blockId] = blockSize;
 
+#if defined(LIBBSC_ALLOW_UNALIGNED_ACCESS)
                     *(int *)(output + 1 + 8 * blockId + 0) = blockSize;
                     *(int *)(output + 1 + 8 * blockId + 4) = compressionResult[blockId];
+#else
+                    memcpy(output + 1 + 8 * blockId + 0, &blockSize, sizeof(int));
+                    memcpy(output + 1 + 8 * blockId + 4, compressionResult + blockId, sizeof(int));
+#endif
                 }
 
                 #pragma omp single
@@ -292,6 +297,7 @@ int bsc_coder_decompress(const unsigned char * input, unsigned char * output, in
         #pragma omp parallel for schedule(dynamic)
         for (int blockId = 0; blockId < nBlocks; ++blockId)
         {
+#if defined(LIBBSC_ALLOW_UNALIGNED_ACCESS)
             int inputPtr  = 0; for (int p = 0; p < blockId; ++p) inputPtr  += *(int *)(input + 1 + 8 * p + 4);
             int outputPtr = 0; for (int p = 0; p < blockId; ++p) outputPtr += *(int *)(input + 1 + 8 * p + 0);
 
@@ -299,6 +305,22 @@ int bsc_coder_decompress(const unsigned char * input, unsigned char * output, in
 
             int inputSize  = *(int *)(input + 1 + 8 * blockId + 4);
             int outputSize = *(int *)(input + 1 + 8 * blockId + 0);
+#else
+            int inputPtr = 0, outputPtr = 0;
+            for (int p = 0; p < blockId; ++p) {
+              int tmp;
+              memcpy(&tmp, input + 1 + 8 * p + 4, sizeof(int));
+              inputPtr += tmp;
+              memcpy(&tmp, input + 1 + 8 * p + 0, sizeof(int));
+              outputPtr += tmp;
+            }
+
+            inputPtr += 1 + 8 * nBlocks;
+
+            int inputSize, outputSize;
+            memcpy(&inputSize, input + 1 + 8 * blockId + 4, sizeof(int));
+            memcpy(&outputSize, input + 1 + 8 * blockId + 0, sizeof(int));
+#endif
 
             if (inputSize != outputSize)
             {
