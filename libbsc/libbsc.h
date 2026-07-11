@@ -104,6 +104,12 @@ extern "C" {
 #endif
 
     /**
+    * Return the libbsc version string.
+    * @return version string in MAJOR.MINOR.PATCH format.
+    */
+    LIBBSC_API const char * bsc_version(void);
+
+    /**
     * You should call this function (or @ref bsc_init_full) before you call any of the other functions in libbsc.
     * @param features - the set of additional features.
     * @return LIBBSC_NO_ERROR if no error occurred, error code otherwise.
