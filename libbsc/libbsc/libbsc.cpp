@@ -57,6 +57,11 @@ static INLINE void bsc_store_int(unsigned char * p, int v)
     memcpy(p, &v, sizeof(v));
 }
 
+const char * bsc_version(void)
+{
+    return LIBBSC_VERSION_STRING;
+}
+
 int bsc_init_full(int features, void* (* malloc)(size_t size), void* (* zero_malloc)(size_t size), void (* free)(void* address))
 {
     int result = LIBBSC_NO_ERROR;
