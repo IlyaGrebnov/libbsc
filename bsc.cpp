@@ -558,13 +558,19 @@ void Compression(char * argv[])
     {
         #pragma omp parallel num_threads(numThreads)
         {
-            compression_omp(argv[2], fInput, inFileSize, argv[4], fOutput, outFileSize, segmentationStart, segmentationEnd);
+            compression_omp(argv[2], fInput, inFileSize, argv[3], fOutput, outFileSize, segmentationStart, segmentationEnd);
         }
     }
     else
 #endif
     {
-        compression_omp(argv[2], fInput, inFileSize, argv[4], fOutput, outFileSize, segmentationStart, segmentationEnd);
+        compression_omp(argv[2], fInput, inFileSize, argv[3], fOutput, outFileSize, segmentationStart, segmentationEnd);
+    }
+
+    if (fflush(fOutput))
+    {
+        fprintf(stderr, "IO error on file: %s!\n", argv[3]);
+        exit(1);
     }
 
     startTime = bsc_now_ns() - startTime;
@@ -947,7 +953,17 @@ void ShowUsage(void)
     fprintf(stdout,"Options may be combined into one, like -b128p -m5e1\n");
 #endif
 
-    exit(0);
+    exit(1);
+}
+
+int ParseNumber(const char * strNum, const char * strEnd)
+{
+    long long number = 0;
+    for (; strNum < strEnd; ++strNum)
+    {
+        number = number * 10 + (*strNum - '0'); if (number > 2147483647) number = 2147483647;
+    }
+    return (int)number;
 }
 
 void ProcessSwitch(char * s)
@@ -964,15 +980,16 @@ void ProcessSwitch(char * s)
             case 'b':
             {
                 char * strNum = s; while ((*s >= '0') && (*s <= '9')) s++;
-                paramBlockSize = atoi(strNum); if (paramBlockSize < 10000) paramBlockSize *= 1024 * 1024;
-                if ((paramBlockSize < 10000) || (paramBlockSize > 2047 * 1024 * 1024)) ShowUsage();
+                long long blockSize = ParseNumber(strNum, s); if (blockSize < 10000) blockSize *= 1024 * 1024;
+                if ((blockSize < 10000) || (blockSize > 2047 * 1024 * 1024)) ShowUsage();
+                paramBlockSize = (int)blockSize;
                 break;
             }
 
             case 'm':
             {
                 char * strNum = s; while ((*s >= '0') && (*s <= '9')) s++;
-                switch (atoi(strNum))
+                switch (ParseNumber(strNum, s))
                 {
                     case 0   : paramBlockSorter = LIBBSC_BLOCKSORTER_BWT; break;
 
@@ -1017,7 +1034,7 @@ void ProcessSwitch(char * s)
             case 'H':
             {
                 char * strNum = s; while ((*s >= '0') && (*s <= '9')) s++;
-                paramLZPHashSize = atoi(strNum);
+                paramLZPHashSize = ParseNumber(strNum, s);
                 if ((paramLZPHashSize < 10) || (paramLZPHashSize > 28)) ShowUsage();
                 break;
             }
@@ -1025,7 +1042,7 @@ void ProcessSwitch(char * s)
             case 'M':
             {
                 char * strNum = s; while ((*s >= '0') && (*s <= '9')) s++;
-                paramLZPMinLen = atoi(strNum);
+                paramLZPMinLen = ParseNumber(strNum, s);
                 if ((paramLZPMinLen < 4) || (paramLZPMinLen > 255)) ShowUsage();
                 break;
             }
@@ -1041,7 +1058,7 @@ void ProcessSwitch(char * s)
             case 'T':
             {
                 char * strNum = s; while ((*s >= '0') && (*s <= '9')) s++;
-                int numThreads = atoi(strNum);
+                int numThreads = ParseNumber(strNum, s);
                 if (numThreads > 1) omp_set_num_threads(numThreads);
                 if (numThreads < 2) paramEnableParallelProcessing = paramEnableMultiThreading = 0;
                 break;
