@@ -57,6 +57,38 @@ static INLINE void bsc_store_int(unsigned char * p, int v)
     memcpy(p, &v, sizeof(v));
 }
 
+#define LIBBSC_COPY_MIN_BLOCK_SIZE (1024 * 1024)
+
+static void bsc_memcpy(unsigned char * destination, const unsigned char * source, int n, int features)
+{
+
+#ifdef LIBBSC_OPENMP
+
+    if (features & LIBBSC_FEATURE_MULTITHREADING)
+    {
+        int numThreads = omp_get_max_threads() / omp_get_num_threads();
+        if (numThreads > n / LIBBSC_COPY_MIN_BLOCK_SIZE) numThreads = n / LIBBSC_COPY_MIN_BLOCK_SIZE;
+
+        if (numThreads > 1)
+        {
+            int blockSize = (n / numThreads) & (-64);
+
+            #pragma omp parallel for schedule(static) num_threads(numThreads)
+            for (int blockId = 0; blockId < numThreads; ++blockId)
+            {
+                int blockStart = blockId * blockSize;
+                memcpy(destination + blockStart, source + blockStart, blockId != numThreads - 1 ? blockSize : n - blockStart);
+            }
+
+            return;
+        }
+    }
+
+#endif
+
+    memcpy(destination, source, n);
+}
+
 const char * bsc_version(void)
 {
     return LIBBSC_VERSION_STRING;
@@ -151,20 +183,11 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
     int lzSize = n;
     if (mode != (mode & 0xff))
     {
-        unsigned char * buffer = (unsigned char *)bsc_malloc(n);
-        if (buffer == NULL) return LIBBSC_NOT_ENOUGH_MEMORY;
-
-        lzSize = bsc_lzp_compress(data, buffer, n, lzpHashSize, lzpMinLen, features);
+        lzSize = bsc_lzp_compress(data, data, n, lzpHashSize, lzpMinLen, features);
         if (lzSize < LIBBSC_NO_ERROR)
         {
             lzSize = n; mode &= 0xff;
         }
-        else
-        {
-            memcpy(data, buffer, lzSize);
-        }
-
-        bsc_free(buffer);
     }
 
     if (lzSize <= LIBBSC_HEADER_SIZE)
@@ -202,7 +225,7 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
     if (unsigned char * buffer = (unsigned char *)bsc_malloc(lzSize + 4096))
     {
         int result = bsc_coder_compress(data, buffer, lzSize, coder, features);
-        if (result >= LIBBSC_NO_ERROR) memcpy(data + LIBBSC_HEADER_SIZE, buffer, result);
+        if (result >= LIBBSC_NO_ERROR) bsc_memcpy(data + LIBBSC_HEADER_SIZE, buffer, result, features);
         bsc_free(buffer);
         if ((result < LIBBSC_NO_ERROR) || (result + 1 + 4 * num_indexes >= n))
         {
@@ -291,7 +314,7 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
     }
     if (mode == (mode & 0xff))
     {
-        lzSize = n; memcpy(output, input, n);
+        lzSize = n; bsc_memcpy(output, input, n, features);
     }
 
     if (lzSize <= LIBBSC_HEADER_SIZE)
@@ -329,7 +352,7 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
     if (unsigned char * buffer = (unsigned char *)bsc_malloc(lzSize + 4096))
     {
         int result = bsc_coder_compress(output, buffer, lzSize, coder, features);
-        if (result >= LIBBSC_NO_ERROR) memcpy(output + LIBBSC_HEADER_SIZE, buffer, result);
+        if (result >= LIBBSC_NO_ERROR) bsc_memcpy(output + LIBBSC_HEADER_SIZE, buffer, result, features);
         bsc_free(buffer);
         if ((result < LIBBSC_NO_ERROR) || (result + 1 + 4 * num_indexes >= n))
         {
@@ -485,7 +508,7 @@ int bsc_decompress_inplace(unsigned char * data, int inputSize, int outputSize, 
         unsigned char * buffer = (unsigned char *)bsc_malloc(blockSize);
         if (buffer == NULL) return LIBBSC_NOT_ENOUGH_MEMORY;
 
-        memcpy(buffer, data, blockSize);
+        bsc_memcpy(buffer, data, blockSize, features);
 
         lzSize = bsc_coder_decompress(buffer + LIBBSC_HEADER_SIZE, data, coder, features);
 
@@ -523,14 +546,16 @@ int bsc_decompress_inplace(unsigned char * data, int inputSize, int outputSize, 
     {
         if (unsigned char * buffer = (unsigned char *)bsc_malloc(lzSize))
         {
-            memcpy(buffer, data, lzSize);
-            result = bsc_lzp_decompress(buffer, data, lzSize, lzpHashSize, lzpMinLen, features);
+            unsigned int adler32_lzp = 0;
+
+            bsc_memcpy(buffer, data, lzSize, features);
+            result = bsc_lzp_decompress(buffer, data, lzSize, lzpHashSize, lzpMinLen, &adler32_lzp, features);
             bsc_free(buffer);
             if (result < LIBBSC_NO_ERROR)
             {
                 return result;
             }
-            return result == dataSize ? (adler32_data == bsc_adler32(data, dataSize, features) ? LIBBSC_NO_ERROR : LIBBSC_DATA_CORRUPT) : LIBBSC_DATA_CORRUPT;
+            return result == dataSize ? (adler32_data == adler32_lzp ? LIBBSC_NO_ERROR : LIBBSC_DATA_CORRUPT) : LIBBSC_DATA_CORRUPT;
         }
         return LIBBSC_NOT_ENOUGH_MEMORY;
     }
@@ -569,7 +594,7 @@ int bsc_decompress(const unsigned char * input, int inputSize, unsigned char * o
     int mode = bsc_load_int(input + 8);
     if (mode == 0)
     {
-        memcpy(output, input + LIBBSC_HEADER_SIZE, dataSize);
+        bsc_memcpy(output, input + LIBBSC_HEADER_SIZE, dataSize, features);
         return LIBBSC_NO_ERROR;
     }
 
@@ -620,14 +645,16 @@ int bsc_decompress(const unsigned char * input, int inputSize, unsigned char * o
     {
         if (unsigned char * buffer = (unsigned char *)bsc_malloc(lzSize))
         {
-            memcpy(buffer, output, lzSize);
-            result = bsc_lzp_decompress(buffer, output, lzSize, lzpHashSize, lzpMinLen, features);
+            unsigned int adler32_lzp = 0;
+
+            bsc_memcpy(buffer, output, lzSize, features);
+            result = bsc_lzp_decompress(buffer, output, lzSize, lzpHashSize, lzpMinLen, &adler32_lzp, features);
             bsc_free(buffer);
             if (result < LIBBSC_NO_ERROR)
             {
                 return result;
             }
-            return result == dataSize ? (adler32_data == bsc_adler32(output, dataSize, features) ? LIBBSC_NO_ERROR : LIBBSC_DATA_CORRUPT) : LIBBSC_DATA_CORRUPT;
+            return result == dataSize ? (adler32_data == adler32_lzp ? LIBBSC_NO_ERROR : LIBBSC_DATA_CORRUPT) : LIBBSC_DATA_CORRUPT;
         }
         return LIBBSC_NOT_ENOUGH_MEMORY;
     }
