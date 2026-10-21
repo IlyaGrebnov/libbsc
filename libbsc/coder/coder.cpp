@@ -91,7 +91,7 @@ void bsc_coder_split_blocks(const unsigned char * input, int n, int nBlocks, int
     int rankSize = 0;
     for (int i = 1; i < n; i += 32)
     {
-        if (input[i] != input[i - 1]) rankSize++;
+        rankSize += input[i] != input[i - 1];
     }
 
     if (rankSize > nBlocks)
@@ -101,18 +101,15 @@ void bsc_coder_split_blocks(const unsigned char * input, int n, int nBlocks, int
         blockStart[0] = 0; rankSize = 0;
         for (int id = 0, i = 1; i < n; i += 32)
         {
-            if (input[i] != input[i - 1])
+            rankSize += input[i] != input[i - 1];
+            if (rankSize == blockRankSize)
             {
-                rankSize++;
-                if (rankSize == blockRankSize)
-                {
-                    rankSize = 0;
+                rankSize = 0;
 
-                    blockSize[id] = i - blockStart[id];
-                    id++; blockStart[id] = i;
+                blockSize[id] = i - blockStart[id];
+                id++; blockStart[id] = i;
 
-                    if (id == nBlocks - 1) break;
-                }
+                if (id == nBlocks - 1) break;
             }
         }
         blockSize[nBlocks - 1] = n - blockStart[nBlocks - 1];
@@ -145,6 +142,21 @@ int bsc_coder_compress_serial(const unsigned char * input, unsigned char * outpu
 
     bsc_coder_split_blocks(input, n, nBlocks, compressedStart, compressedSize);
 
+    int maxBlockSize = 0;
+    for (int blockId = 0; blockId < nBlocks; ++blockId)
+    {
+        if (maxBlockSize < compressedSize[blockId]) maxBlockSize = compressedSize[blockId];
+    }
+
+    void * model = bsc_malloc(bsc_qlfc_model_size(coder));
+    unsigned char * buffer = (unsigned char *)bsc_malloc(maxBlockSize * sizeof(unsigned char));
+    if (model == NULL || buffer == NULL)
+    {
+        if (buffer != NULL) bsc_free(buffer);
+        if (model != NULL) bsc_free(model);
+        return LIBBSC_NOT_ENOUGH_MEMORY;
+    }
+
     output[0] = nBlocks;
     for (int blockId = 0; blockId < nBlocks; ++blockId)
     {
@@ -152,10 +164,10 @@ int bsc_coder_compress_serial(const unsigned char * input, unsigned char * outpu
         int inputSize   = compressedSize[blockId];
         int outputSize  = inputSize; if (outputSize > n - outputPtr) outputSize = n - outputPtr;
 
-        int result = bsc_coder_encode_block(input + inputStart, output + outputPtr, inputSize, outputSize, coder);
+        int result = bsc_qlfc_encode_block_model(input + inputStart, output + outputPtr, buffer, inputSize, outputSize, coder, model);
         if (result < LIBBSC_NO_ERROR)
         {
-            if (outputPtr + inputSize >= n) return LIBBSC_NOT_COMPRESSIBLE;
+            if (outputPtr + inputSize >= n) { outputPtr = LIBBSC_NOT_COMPRESSIBLE; break; }
             result = inputSize; memcpy(output + outputPtr, input + inputStart, inputSize);
         }
 
@@ -165,10 +177,70 @@ int bsc_coder_compress_serial(const unsigned char * input, unsigned char * outpu
         outputPtr += result;
     }
 
+    bsc_free(buffer); bsc_free(model);
+
     return outputPtr;
 }
 
 #ifdef LIBBSC_OPENMP
+
+void bsc_coder_split_blocks_parallel(const unsigned char * input, int n, int nBlocks, int * blockStart, int * blockSize, int * threadRankSize)
+{
+    int numSamples  = (n + 30) / 32;
+    int threadId    = omp_get_thread_num();
+    int numThreads  = omp_get_num_threads();
+    int sampleStart = (int)(((long long)numSamples * (threadId + 0)) / numThreads);
+    int sampleEnd   = (int)(((long long)numSamples * (threadId + 1)) / numThreads);
+
+    int rankSize = 0;
+    for (int i = 1 + 32 * sampleStart; i < 1 + 32 * sampleEnd; i += 32)
+    {
+        rankSize += input[i] != input[i - 1];
+    }
+
+    threadRankSize[threadId] = rankSize;
+
+    #pragma omp barrier
+
+    int totalRankSize = 0, threadRankStart = 0;
+    for (int t = 0; t < numThreads; ++t)
+    {
+        if (t == threadId) threadRankStart = totalRankSize;
+        totalRankSize += threadRankSize[t];
+    }
+
+    if (totalRankSize > nBlocks)
+    {
+        int blockRankSize = totalRankSize / nBlocks;
+
+        rankSize = threadRankStart;
+        for (int id = rankSize / blockRankSize + 1, i = 1 + 32 * sampleStart; (i < 1 + 32 * sampleEnd) && (id < nBlocks); i += 32)
+        {
+            rankSize += input[i] != input[i - 1];
+            if (rankSize == id * blockRankSize) { blockStart[id] = i; id++; }
+        }
+
+        #pragma omp barrier
+
+        #pragma omp single
+        {
+            blockStart[0] = 0;
+            for (int id = 0; id < nBlocks - 1; ++id) { blockSize[id] = blockStart[id + 1] - blockStart[id]; }
+            blockSize[nBlocks - 1] = n - blockStart[nBlocks - 1];
+        }
+    }
+    else
+    {
+        #pragma omp single
+        {
+            for (int p = 0; p < nBlocks; ++p)
+            {
+                blockStart[p] = (n / nBlocks) * p;
+                blockSize[p]  = (p != nBlocks - 1) ? n / nBlocks : n - (n / nBlocks) * (nBlocks - 1);
+            }
+        }
+    }
+}
 
 int bsc_coder_compress_parallel(const unsigned char * input, unsigned char * output, int n, int coder)
 {
@@ -179,6 +251,7 @@ int bsc_coder_compress_parallel(const unsigned char * input, unsigned char * out
         int compressionResult[ALPHABET_SIZE];
         int compressedStart[ALPHABET_SIZE];
         int compressedSize[ALPHABET_SIZE];
+        int threadRankSize[ALPHABET_SIZE];
 
         int result  = LIBBSC_NO_ERROR;
 
@@ -194,10 +267,7 @@ int bsc_coder_compress_parallel(const unsigned char * input, unsigned char * out
             }
             else
             {
-                #pragma omp single
-                {
-                    bsc_coder_split_blocks(input, n, nBlocks, compressedStart, compressedSize);
-                }
+                bsc_coder_split_blocks_parallel(input, n, nBlocks, compressedStart, compressedSize, threadRankSize);
 
                 #pragma omp for ordered schedule(dynamic, 1)
                 for (int blockId = 0; blockId < nBlocks; ++blockId)
@@ -332,6 +402,8 @@ int bsc_coder_decompress(const unsigned char * input, unsigned char * output, in
 #endif
 
     {
+        void * model = NULL;
+
         for (int blockId = 0; blockId < nBlocks; ++blockId)
         {
             int inputPtr  = 0; int inputSize;
@@ -352,13 +424,16 @@ int bsc_coder_decompress(const unsigned char * input, unsigned char * output, in
 
             if (inputSize != outputSize)
             {
-                decompressionResult[blockId] = bsc_coder_decode_block(input + inputPtr, output + outputPtr, coder);
+                if (model == NULL) model = bsc_malloc(bsc_qlfc_model_size(coder));
+                decompressionResult[blockId] = model != NULL ? bsc_qlfc_decode_block_model(input + inputPtr, output + outputPtr, coder, model) : LIBBSC_NOT_ENOUGH_MEMORY;
             }
             else
             {
                 decompressionResult[blockId] = inputSize; memcpy(output + outputPtr, input + inputPtr, inputSize);
             }
         }
+
+        if (model != NULL) bsc_free(model);
     }
 
     int dataSize = 0, result = LIBBSC_NO_ERROR;

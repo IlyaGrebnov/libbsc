@@ -195,9 +195,9 @@ public:
 
         struct Mantissa
         {
-            short StaticModel[ALPHABET_SIZE];
-            short StateModel[ALPHABET_SIZE][ALPHABET_SIZE];
-            short CharModel[ALPHABET_SIZE][ALPHABET_SIZE];
+            short StaticModel[128];
+            short StateModel[ALPHABET_SIZE][128];
+            short CharModel[ALPHABET_SIZE][128];
         } Mantissa[8];
 
         struct Escape
@@ -248,7 +248,7 @@ public:
     struct Rank
     {
         short Exponent[ALPHABET_SIZE][8];
-        short Mantissa[ALPHABET_SIZE][8][ALPHABET_SIZE];
+        short Mantissa[ALPHABET_SIZE][8][128];
     } Rank;
 
     struct Run
