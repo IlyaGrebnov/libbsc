@@ -257,6 +257,7 @@ int bsc_coder_compress_parallel(const unsigned char * input, unsigned char * out
 
         int numThreads = omp_get_max_threads() / omp_get_num_threads();
         if (numThreads > nBlocks) numThreads = nBlocks;
+        if (numThreads < 1) numThreads = 1;
 
         output[0] = nBlocks;
         #pragma omp parallel num_threads(numThreads) if(numThreads > 1)
@@ -361,6 +362,8 @@ int bsc_coder_decompress(const unsigned char * input, unsigned char * output, in
 
     int decompressionResult[ALPHABET_SIZE];
 
+    int pendingBlocks = nBlocks;
+
 #ifdef LIBBSC_OPENMP
 
     int numThreads = omp_get_max_threads() / omp_get_num_threads();
@@ -396,16 +399,24 @@ int bsc_coder_decompress(const unsigned char * input, unsigned char * output, in
                 decompressionResult[blockId] = inputSize; memcpy(output + outputPtr, input + inputPtr, inputSize);
             }
         }
+
+        pendingBlocks = 0;
+        for (int blockId = 0; blockId < nBlocks; ++blockId)
+        {
+            if (decompressionResult[blockId] == LIBBSC_NOT_ENOUGH_MEMORY) pendingBlocks++;
+        }
     }
-    else
 
 #endif
 
+    if (pendingBlocks > 0)
     {
         void * model = NULL;
 
         for (int blockId = 0; blockId < nBlocks; ++blockId)
         {
+            if (pendingBlocks < nBlocks && decompressionResult[blockId] != LIBBSC_NOT_ENOUGH_MEMORY) continue;
+
             int inputPtr  = 0; int inputSize;
             int outputPtr = 0; int outputSize;
 

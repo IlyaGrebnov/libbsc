@@ -581,7 +581,7 @@ int QLFC_ADAPTIVE_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned ch
 
         if (currentChar == prevChar)
         {
-            maxRank = bsc_bit_scan_reverse(rank - 1);
+            maxRank = rank > 1 ? bsc_bit_scan_reverse(rank - 1) : 0;
             break;
         }
 
@@ -944,7 +944,7 @@ int QLFC_STATIC_ENCODE_FUNCTION_NAME (const unsigned char * input, unsigned char
 
         if (currentChar == prevChar)
         {
-            maxRank = bsc_bit_scan_reverse(rank - 1);
+            maxRank = rank > 1 ? bsc_bit_scan_reverse(rank - 1) : 0;
             break;
         }
 
@@ -1480,7 +1480,7 @@ int QLFC_ADAPTIVE_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned ch
 
         if (currentChar == prevChar)
         {
-            maxRank = bsc_bit_scan_reverse(rank - 1);
+            maxRank = rank > 1 ? bsc_bit_scan_reverse(rank - 1) : 0;
             break;
         }
 
@@ -1801,7 +1801,7 @@ int QLFC_STATIC_DECODE_FUNCTION_NAME (const unsigned char * input, unsigned char
 
         if (currentChar == prevChar)
         {
-            maxRank = bsc_bit_scan_reverse(rank - 1);
+            maxRank = rank > 1 ? bsc_bit_scan_reverse(rank - 1) : 0;
             break;
         }
 

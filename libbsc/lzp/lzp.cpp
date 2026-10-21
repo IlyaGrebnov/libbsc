@@ -1144,6 +1144,8 @@ int bsc_lzp_decompress(const unsigned char * input, unsigned char * output, int 
     int             decompressionResult[ALPHABET_SIZE];
     unsigned int    decompressionChecksum[ALPHABET_SIZE];
 
+    int pendingBlocks = nBlocks;
+
 #ifdef LIBBSC_OPENMP
 
     int numThreads = omp_get_max_threads() / omp_get_num_threads();
@@ -1182,11 +1184,17 @@ int bsc_lzp_decompress(const unsigned char * input, unsigned char * output, int 
             if (decompressionResult[blockId] >= LIBBSC_NO_ERROR && decompressionResult[blockId] != outputSize) decompressionResult[blockId] = LIBBSC_DATA_CORRUPT;
             if (adler32 != NULL && decompressionResult[blockId] >= LIBBSC_NO_ERROR) decompressionChecksum[blockId] = bsc_adler32(output + outputPtr, decompressionResult[blockId], features);
         }
+
+        pendingBlocks = 0;
+        for (int blockId = 0; blockId < nBlocks; ++blockId)
+        {
+            if (decompressionResult[blockId] == LIBBSC_NOT_ENOUGH_MEMORY) pendingBlocks++;
+        }
     }
-    else
 
 #endif
 
+    if (pendingBlocks > 0)
     {
         int chunkSize; memcpy(&chunkSize, input + 1, sizeof(int));
 
@@ -1196,6 +1204,8 @@ int bsc_lzp_decompress(const unsigned char * input, unsigned char * output, int 
 
         for (int blockId = 0; blockId < nBlocks; ++blockId)
         {
+            if (pendingBlocks < nBlocks && decompressionResult[blockId] != LIBBSC_NOT_ENOUGH_MEMORY) continue;
+
             int inputPtr  = 0; int inputSize;
             int outputPtr = 0; int outputSize;
 
