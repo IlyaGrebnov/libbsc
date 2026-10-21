@@ -8,7 +8,7 @@
 This file is a part of bsc and/or libbsc, a program and a library for
 lossless, block-sorting data compression.
 
-   Copyright (c) 2009-2025 Ilya Grebnov <ilya.grebnov@gmail.com>
+   Copyright (c) 2009-2026 Ilya Grebnov <ilya.grebnov@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -1107,8 +1107,8 @@ int main(int argc, char * argv[])
 #endif
 #endif
 
-    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version %s, 9 September 2025.\n", LIBBSC_VERSION_STRING);
-    fprintf(stdout, "Copyright (c) 2009-2025 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
+    fprintf(stdout, "This is bsc, Block Sorting Compressor. Version %s, 21 October 2026.\n", LIBBSC_VERSION_STRING);
+    fprintf(stdout, "Copyright (c) 2009-2026 Ilya Grebnov <Ilya.Grebnov@gmail.com>.\n\n");
 
     ProcessCommandline(argc, argv);
 

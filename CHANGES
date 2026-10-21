@@ -1,3 +1,14 @@
+Changes in 3.4.0 (October 21, 2026)
+- Updated libsais to v2.12.1.
+- Fixed data corruption in multithreaded compression (present since 3.1.0).
+- Due to this fix, an upgrade to this version is strongly recommended.
+- Improved LZP compression and decompression performance.
+- Improved QLFC compression and decompression performance.
+- Improved multi-block compression and decompression performance.
+- Improved robustness under memory pressure and on 32-bit systems.
+- Fixed command-line error handling.
+- Support for ARM64EC builds; big-endian targets are rejected at compile time.
+
 Changes in 3.3.12 (September 9, 2025)
 - Updated libsais to v2.10.4.
 - Cross-platform monotonic nanosecond clock.
