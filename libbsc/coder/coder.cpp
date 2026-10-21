@@ -172,13 +172,14 @@ int bsc_coder_compress_serial(const unsigned char * input, unsigned char * outpu
 
 int bsc_coder_compress_parallel(const unsigned char * input, unsigned char * output, int n, int coder)
 {
-    if (unsigned char * buffer = (unsigned char *)bsc_malloc(n * sizeof(unsigned char)))
+    int nBlocks = bsc_coder_num_blocks(n);
+
+    if (unsigned char * buffer = (unsigned char *)bsc_malloc((n + 4096 * nBlocks) * sizeof(unsigned char)))
     {
         int compressionResult[ALPHABET_SIZE];
         int compressedStart[ALPHABET_SIZE];
         int compressedSize[ALPHABET_SIZE];
 
-        int nBlocks = bsc_coder_num_blocks(n);
         int result  = LIBBSC_NO_ERROR;
 
         int numThreads = omp_get_max_threads() / omp_get_num_threads();
@@ -205,7 +206,7 @@ int bsc_coder_compress_parallel(const unsigned char * input, unsigned char * out
                     int blockSize    = compressedSize[blockId];
                     int outputPtr    = 1 + 8 * nBlocks;
 
-                    compressionResult[blockId] = bsc_coder_encode_block(input + blockStart, buffer + blockStart, blockSize, blockSize, coder);
+                    compressionResult[blockId] = bsc_coder_encode_block(input + blockStart, buffer + blockStart + 4096 * blockId, blockSize, blockSize, coder);
                     if (compressionResult[blockId] < LIBBSC_NO_ERROR) compressionResult[blockId] = blockSize;
 
                     memcpy(output + 1 + 8 * blockId + 0, &blockSize, sizeof(int));
@@ -220,7 +221,7 @@ int bsc_coder_compress_parallel(const unsigned char * input, unsigned char * out
                     {
                         if (compressionResult[blockId] != blockSize)
                         {
-                            memcpy(output + outputPtr, buffer + blockStart, compressionResult[blockId]);
+                            memcpy(output + outputPtr, buffer + blockStart + 4096 * blockId, compressionResult[blockId]);
                         }
                         else
                         {

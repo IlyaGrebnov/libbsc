@@ -117,7 +117,7 @@ public:
 
     INLINE bool CheckEOB()
     {
-        return ari_output >= ari_outputEOB;
+        return ari_output + ari_ffnum >= ari_outputEOB;
     }
 
     INLINE void InitEncoder(unsigned char * output, int outputSize)
