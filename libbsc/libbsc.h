@@ -134,7 +134,7 @@ extern "C" {
     * @param lzpHashSize                        - the hash table size if LZP enabled, 0 otherwise. Must be in range [0, 10..28].
     * @param lzpMinLen                          - the minimum match length if LZP enabled, 0 otherwise. Must be in range [0, 4..255].
     * @param blockSorter                        - the block sorting algorithm. Must be in range [ST3..ST8, BWT].
-    * @param coder                              - the entropy coding algorithm. Must be in range [MTF or QLFC].
+    * @param coder                              - the entropy coding algorithm. Must be in range QLFC_[STATIC, ADAPTIVE, FAST].
     * @param features                           - the set of additional features.
     * @return the length of compressed memory block if no error occurred, error code otherwise.
     */
