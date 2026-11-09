@@ -29,8 +29,8 @@ Please see the file LICENSE for full copyright information.
 
 #define LIBSAIS_VERSION_MAJOR   2
 #define LIBSAIS_VERSION_MINOR   12
-#define LIBSAIS_VERSION_PATCH   1
-#define LIBSAIS_VERSION_STRING  "2.12.1"
+#define LIBSAIS_VERSION_PATCH   2
+#define LIBSAIS_VERSION_STRING  "2.12.2"
 
 #ifdef _WIN32
     #ifdef LIBSAIS_SHARED

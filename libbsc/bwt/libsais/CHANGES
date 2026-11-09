@@ -1,3 +1,11 @@
+Changes in 2.12.2 (November 9, 2026)
+- Improved performance of suffix array and Burrows-Wheeler transform construction and of the inverse Burrows-Wheeler transform, both single- and multi-threaded.
+- Fixed a hang at process exit with MinGW (libgomp) after a multi-threaded inverse BWT: inverse BWT now uses the requested number of threads in every parallel region, as suffix array construction does.
+- libsais64 and libsais16x64 now return -1 for a thread count above INT_MAX.
+- Fixed out-of-bounds writes in libsais64 and libsais16x64 with thread counts of 2^32 or more in 32-bit builds.
+- Worked around a GCC issue that made AVX-512 builds fault under AddressSanitizer.
+- Resolved compiler warnings under -Wstrict-aliasing=1 and -Wconversion.
+
 Changes in 2.12.1 (October 21, 2026)
 - Fixed compilation errors and warnings with MSVC for ARM64 and ARM64EC targets.
 - Fixed incorrect results on big-endian AArch64 targets, and of libsais64 and libsais16x64 on all big-endian targets.
