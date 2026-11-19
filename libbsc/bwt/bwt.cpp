@@ -45,6 +45,34 @@ See also the bsc and libbsc web site:
     #error "LIBBSC_OPENMP requires LIBSAIS_OPENMP to be defined. Please define LIBSAIS_OPENMP and enable OpenMP support for libsais."
 #endif
 
+#ifdef LIBBSC_OPENMP
+
+static INLINE int bsc_bwt_decode_num_threads(int n)
+{
+    struct entry { int threads; int threshold; };
+
+    static const struct entry break_points[] =
+    {
+        { 128, 128 * 128 * 65536 },
+        {  96,  96 *  96 * 65536 },
+        {  64,  64 *  64 * 65536 },
+        {  48,  48 *  48 * 65536 },
+        {  32,  32 *  32 * 65536 },
+        {  24,  24 *  24 * 65536 },
+        {  16,  16 *  16 * 65536 },
+        {  12,  12 *  12 * 65536 },
+    };
+
+    for (int i = 0; i < sizeof(break_points) / sizeof(break_points[0]); i += 1)
+    {
+        if (n >= break_points[i].threshold) { return break_points[i].threads; }
+    }
+
+    return 8;
+}
+
+#endif
+
 #if defined(LIBBSC_CUDA_SUPPORT) && defined(LIBBSC_OPENMP)
 
 omp_lock_t bwt_cuda_lock;
@@ -316,6 +344,7 @@ int bsc_bwt_decode(unsigned char * T, int n, int index, unsigned char num_indexe
 
 #ifdef LIBBSC_OPENMP
             int numThreads = (features & LIBBSC_FEATURE_MULTITHREADING) > 0 ? omp_get_max_threads() / omp_get_num_threads() : 1;
+            if (numThreads > bsc_bwt_decode_num_threads(n)) numThreads = bsc_bwt_decode_num_threads(n);
             index = libsais_unbwt_aux_omp(T, T, P, n, NULL, mod + 1, I, numThreads > 1 ? numThreads : 1);
 #else
             index = libsais_unbwt_aux(T, T, P, n, NULL, mod + 1, I);
@@ -325,6 +354,7 @@ int bsc_bwt_decode(unsigned char * T, int n, int index, unsigned char num_indexe
         {
 #ifdef LIBBSC_OPENMP
             int numThreads = (features & LIBBSC_FEATURE_MULTITHREADING) > 0 ? omp_get_max_threads() / omp_get_num_threads() : 1;
+            if (numThreads > bsc_bwt_decode_num_threads(n)) numThreads = bsc_bwt_decode_num_threads(n);
             index = libsais_unbwt_omp(T, T, P, n, NULL, index, numThreads > 1 ? numThreads : 1);
 #else
             index = libsais_unbwt(T, T, P, n, NULL, index);

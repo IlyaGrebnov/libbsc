@@ -70,7 +70,14 @@ static INLINE int bsc_lzp_num_blocks(int n)
     return 1;
 }
 
-#if !defined(LIBBSC_NO_UNALIGNED_ACCESS) && (defined(LIBBSC_x86_64) || defined(LIBBSC_AArch64))
+#if defined(LIBBSC_x86_64) || defined(LIBBSC_AArch64)
+
+static INLINE const unsigned char * bsc_lzp_encode_limit(const unsigned char * input, const unsigned char * inputMinLenEnd, const unsigned char * output, const unsigned char * outputEOB)
+{
+    if ((inputMinLenEnd - input) < (outputEOB - output)) return inputMinLenEnd;
+
+    return (output < outputEOB) ? input + (outputEOB - output) : input;
+}
 
 template<class T> int bsc_lzp_encode_small(const unsigned char * RESTRICT input, const unsigned char * inputEnd, unsigned char * RESTRICT output, unsigned char * outputEnd, int * RESTRICT lookup, int mask)
 {
@@ -83,35 +90,43 @@ template<class T> int bsc_lzp_encode_small(const unsigned char * RESTRICT input,
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
     {
-        while ((input < inputMinLenEnd) && (output < outputEOB))
-        {
-            unsigned long long next8 = *(unsigned long long *)(input - 4); *(unsigned int *)(output) = (unsigned int)(next8 >> 32); next8 = bsc_byteswap_uint64(next8);
+        const unsigned char * inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB);
 
-            int value;
+        while (input < inputLimit)
+        {
+            unsigned long long next8 = bsc_unaligned_load<unsigned long long>(input - 4); memcpy(output, input, sizeof(unsigned long long)); next8 = bsc_byteswap_uint64(next8);
+
+            int value; const int position = (int)(input - inputStart);
             {
                 unsigned long long mix = (((next8 >> 12) ^ next8) >> 3) ^ next8;
 
-                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = (int)(input - inputStart + 0); 
-                if ((*(T *)(input + 0) == *(T *)(inputStart + value)) && (value > 0)) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
-                if (((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
+                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = position + 0; 
+                if (bsc_unaligned_load<T>(input + 0) == bsc_unaligned_load<T>(inputStart + value)) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
+                if ((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
 
-                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = (int)(input - inputStart + 1); 
-                if ((*(T *)(input + 1) == *(T *)(inputStart + value)) && (value > 0)) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
-                if (((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
+                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = position + 1; 
+                if (bsc_unaligned_load<T>(input + 1) == bsc_unaligned_load<T>(inputStart + value)) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
+                if ((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
 
-                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = (int)(input - inputStart + 2); 
-                if ((*(T *)(input + 2) == *(T *)(inputStart + value)) && (value > 0)) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
-                if (((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
+                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = position + 2; 
+                if (bsc_unaligned_load<T>(input + 2) == bsc_unaligned_load<T>(inputStart + value)) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
+                if ((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
 
-                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = (int)(input - inputStart + 3); 
-                if ((*(T *)(input + 3) == *(T *)(inputStart + value)) && (value > 0)) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
-                if (((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
+                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = position + 3; 
+                if (bsc_unaligned_load<T>(input + 3) == bsc_unaligned_load<T>(inputStart + value)) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
+                if ((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
 
-                input += 4; output += 4;
+                const unsigned int index4 = (mix >> (0 * 8)) & mask; value = lookup[index4]; lookup[index4] = position + 4;
+                if (bsc_unaligned_load<T>(input + 4) == bsc_unaligned_load<T>(inputStart + value)) goto LIBBSC_LZP_GOOD_MATCH_FOUND5;
+                if (input[4] == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND5;
+
+                input += 5; output += 5;
 
                 continue;
             }
 
+LIBBSC_LZP_GOOD_MATCH_FOUND5:
+            input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND4:
             input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND3:
@@ -119,6 +134,8 @@ LIBBSC_LZP_GOOD_MATCH_FOUND3:
 LIBBSC_LZP_GOOD_MATCH_FOUND2:
             input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND1:
+
+            if (value <= 0) { input += 1; output += 1; continue; }
 
             {
                 const unsigned char * RESTRICT reference = inputStart + value;
@@ -128,7 +145,7 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
                 for (; input + len < inputMinLenEnd; len += sizeof(unsigned long long))
                 {
                     unsigned long long m;
-                    if ((m = (*(unsigned long long *)(input + len)) ^ *(unsigned long long *)(reference + len)) != 0) 
+                    if ((m = bsc_unaligned_load<unsigned long long>(input + len) ^ bsc_unaligned_load<unsigned long long>(reference + len)) != 0) 
                     {
                         len += bsc_bit_scan_forward64(m) / 8; break;
                     }
@@ -136,19 +153,21 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
 
                 input += len; len -= sizeof(T);
 
-                *output++ = LIBBSC_LZP_MATCH_FLAG; while (len >= 254) { len -= 254; *output++ = 254; if (output >= outputEOB) break; } *output++ = (unsigned char)(len); 
+                *output++ = LIBBSC_LZP_MATCH_FLAG; while (len >= 254) { len -= 254; *output++ = 254; if (output >= outputEOB) break; } *output++ = (unsigned char)(len); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); 
             
                 continue;
             }
 
+LIBBSC_LZP_BAD_MATCH_FOUND5:
+            input += 5; output += 5; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND4:
-            input += 4; output += 4; *output++ = 255; continue;
+            input += 4; output += 4; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND3:
-            input += 3; output += 3; *output++ = 255; continue;
+            input += 3; output += 3; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND2:
-            input += 2; output += 2; *output++ = 255; continue;
+            input += 2; output += 2; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND1:
-            input += 1; output += 1; *output++ = 255; continue;
+            input += 1; output += 1; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
         }
     }
     
@@ -179,35 +198,43 @@ template<class T> int bsc_lzp_encode_small2x(const unsigned char * RESTRICT inpu
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
     {
-        while ((input < inputMinLenEnd) && (output < outputEOB))
-        {
-            unsigned long long next8 = *(unsigned long long *)(input - 4); *(unsigned int *)(output) = (unsigned int)(next8 >> 32); next8 = bsc_byteswap_uint64(next8);
+        const unsigned char * inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB);
 
-            int value;
+        while (input < inputLimit)
+        {
+            unsigned long long next8 = bsc_unaligned_load<unsigned long long>(input - 4); memcpy(output, input, sizeof(unsigned long long)); next8 = bsc_byteswap_uint64(next8);
+
+            int value; const int position = (int)(input - inputStart);
             {
                 unsigned long long mix = (((next8 >> 12) ^ next8) >> 3) ^ next8;
 
-                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = (int)(input - inputStart + 0); 
-                if ((*(T *)(input + sizeof(T) + 0) == *(T *)(inputStart + value + sizeof(T))) && (value > 0) && (*(T *)(input + 0) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
-                if (((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
+                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = position + 0; 
+                if ((bsc_unaligned_load<T>(input + sizeof(T) + 0) == bsc_unaligned_load<T>(inputStart + value + sizeof(T))) && (bsc_unaligned_load<T>(input + 0) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
+                if ((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
 
-                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = (int)(input - inputStart + 1); 
-                if ((*(T *)(input + sizeof(T) + 1) == *(T *)(inputStart + value + sizeof(T))) && (value > 0) && (*(T *)(input + 1) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
-                if (((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
+                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = position + 1; 
+                if ((bsc_unaligned_load<T>(input + sizeof(T) + 1) == bsc_unaligned_load<T>(inputStart + value + sizeof(T))) && (bsc_unaligned_load<T>(input + 1) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
+                if ((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
 
-                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = (int)(input - inputStart + 2); 
-                if ((*(T *)(input + sizeof(T) + 2) == *(T *)(inputStart + value + sizeof(T))) && (value > 0) && (*(T *)(input + 2) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
-                if (((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
+                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = position + 2; 
+                if ((bsc_unaligned_load<T>(input + sizeof(T) + 2) == bsc_unaligned_load<T>(inputStart + value + sizeof(T))) && (bsc_unaligned_load<T>(input + 2) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
+                if ((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
 
-                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = (int)(input - inputStart + 3); 
-                if ((*(T *)(input + sizeof(T) + 3) == *(T *)(inputStart + value + sizeof(T))) && (value > 0) && (*(T *)(input + 3) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
-                if (((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
+                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = position + 3; 
+                if ((bsc_unaligned_load<T>(input + sizeof(T) + 3) == bsc_unaligned_load<T>(inputStart + value + sizeof(T))) && (bsc_unaligned_load<T>(input + 3) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
+                if ((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
 
-                input += 4; output += 4;
+                const unsigned int index4 = (mix >> (0 * 8)) & mask; value = lookup[index4]; lookup[index4] = position + 4;
+                if ((bsc_unaligned_load<T>(input + sizeof(T) + 4) == bsc_unaligned_load<T>(inputStart + value + sizeof(T))) && (bsc_unaligned_load<T>(input + 4) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND5;
+                if (input[4] == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND5;
+
+                input += 5; output += 5;
 
                 continue;
             }
 
+LIBBSC_LZP_GOOD_MATCH_FOUND5:
+            input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND4:
             input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND3:
@@ -215,6 +242,8 @@ LIBBSC_LZP_GOOD_MATCH_FOUND3:
 LIBBSC_LZP_GOOD_MATCH_FOUND2:
             input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND1:
+
+            if (value <= 0) { input += 1; output += 1; continue; }
 
             {
                 const unsigned char * RESTRICT reference = inputStart + value;
@@ -224,7 +253,7 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
                 for (; input + len < inputMinLenEnd; len += sizeof(unsigned long long))
                 {
                     unsigned long long m;
-                    if ((m = (*(unsigned long long *)(input + len)) ^ *(unsigned long long *)(reference + len)) != 0) 
+                    if ((m = bsc_unaligned_load<unsigned long long>(input + len) ^ bsc_unaligned_load<unsigned long long>(reference + len)) != 0) 
                     {
                         len += bsc_bit_scan_forward64(m) / 8; break;
                     }
@@ -232,19 +261,21 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
 
                 input += len; len -= sizeof(T) + sizeof(T);
 
-                *output++ = LIBBSC_LZP_MATCH_FLAG; while (len >= 254) { len -= 254; *output++ = 254; if (output >= outputEOB) break; } *output++ = (unsigned char)(len); 
+                *output++ = LIBBSC_LZP_MATCH_FLAG; while (len >= 254) { len -= 254; *output++ = 254; if (output >= outputEOB) break; } *output++ = (unsigned char)(len); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); 
             
                 continue;
             }
 
+LIBBSC_LZP_BAD_MATCH_FOUND5:
+            input += 5; output += 5; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND4:
-            input += 4; output += 4; *output++ = 255; continue;
+            input += 4; output += 4; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND3:
-            input += 3; output += 3; *output++ = 255; continue;
+            input += 3; output += 3; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND2:
-            input += 2; output += 2; *output++ = 255; continue;
+            input += 2; output += 2; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND1:
-            input += 1; output += 1; *output++ = 255; continue;
+            input += 1; output += 1; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
         }
     }
     
@@ -277,27 +308,27 @@ template<class T> int bsc_lzp_encode_medium(const unsigned char * RESTRICT input
     {
         while ((input < inputMinLenEnd) && (output < outputEOB))
         {
-            unsigned long long next8 = *(unsigned long long *)(input - 4); *(unsigned int *)(output) = (unsigned int)(next8 >> 32); next8 = bsc_byteswap_uint64(next8);
+            unsigned long long next8 = bsc_unaligned_load<unsigned long long>(input - 4); bsc_unaligned_store<unsigned int>(output, (unsigned int)(next8 >> 32)); next8 = bsc_byteswap_uint64(next8);
 
-            int value;
+            int value; const int position = (int)(input - inputStart);
             {
                 unsigned long long mix = (((next8 >> 12) ^ next8) >> 3) ^ next8;
 
-                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = (int)(input - inputStart + 0); 
-                if ((*(T *)(input + minLen - sizeof(T) + 0) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 0) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
-                if (((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
+                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = position + 0; 
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 0) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 0) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
+                if ((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
 
-                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = (int)(input - inputStart + 1); 
-                if ((*(T *)(input + minLen - sizeof(T) + 1) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 1) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
-                if (((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
+                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = position + 1; 
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 1) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 1) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
+                if ((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
 
-                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = (int)(input - inputStart + 2); 
-                if ((*(T *)(input + minLen - sizeof(T) + 2) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 2) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
-                if (((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
+                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = position + 2; 
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 2) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 2) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
+                if ((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
 
-                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = (int)(input - inputStart + 3); 
-                if ((*(T *)(input + minLen - sizeof(T) + 3) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 3) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
-                if (((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
+                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = position + 3; 
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 3) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 3) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
+                if ((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
 
                 input += 4; output += 4;
 
@@ -312,6 +343,8 @@ LIBBSC_LZP_GOOD_MATCH_FOUND2:
             input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND1:
 
+            if (value <= 0) { input += 1; output += 1; continue; }
+
             {
                 const unsigned char * RESTRICT reference = inputStart + value;
 
@@ -320,7 +353,7 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
                 for (; input + len < inputMinLenEnd; len += sizeof(unsigned long long))
                 {
                     unsigned long long m;
-                    if ((m = (*(unsigned long long *)(input + len)) ^ *(unsigned long long *)(reference + len)) != 0) 
+                    if ((m = bsc_unaligned_load<unsigned long long>(input + len) ^ bsc_unaligned_load<unsigned long long>(reference + len)) != 0) 
                     {
                         len += bsc_bit_scan_forward64(m) / 8; break;
                     }
@@ -334,13 +367,13 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
             }
 
 LIBBSC_LZP_BAD_MATCH_FOUND4:
-            input += 4; output += 4; *output++ = 255; continue;
+            input += 4; output += 4; *output = 255; output += (value > 0); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND3:
-            input += 3; output += 3; *output++ = 255; continue;
+            input += 3; output += 3; *output = 255; output += (value > 0); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND2:
-            input += 2; output += 2; *output++ = 255; continue;
+            input += 2; output += 2; *output = 255; output += (value > 0); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND1:
-            input += 1; output += 1; *output++ = 255; continue;
+            input += 1; output += 1; *output = 255; output += (value > 0); continue;
         }
     }
     
@@ -368,40 +401,48 @@ template<class T> int bsc_lzp_encode_large(const unsigned char * RESTRICT input,
     const unsigned char * inputMinLenEnd = inputEnd - minLen - 32;
 
     const unsigned char * heuristic      = input;
-    unsigned long long    heuristic_v    = (input < inputMinLenEnd) ? *(unsigned long long *)heuristic : 0;
+    unsigned long long    heuristic_v    = (input < inputMinLenEnd) ? bsc_unaligned_load<unsigned long long>(heuristic) : 0;
 
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
     {
-        while ((input < inputMinLenEnd) && (output < outputEOB))
-        {
-            unsigned long long next8 = *(unsigned long long *)(input - 4); *(unsigned int *)(output) = (unsigned int)(next8 >> 32); next8 = bsc_byteswap_uint64(next8);
+        const unsigned char * inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB);
 
-            int value;
+        while (input < inputLimit)
+        {
+            unsigned long long next8 = bsc_unaligned_load<unsigned long long>(input - 4); memcpy(output, input, sizeof(unsigned long long)); next8 = bsc_byteswap_uint64(next8);
+
+            int value; const int position = (int)(input - inputStart);
             {
                 unsigned long long mix = (((next8 >> 12) ^ next8) >> 3) ^ next8;
 
-                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = (int)(input - inputStart + 0);
-                if ((*(T *)(input + minLen - sizeof(T) + 0) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 0) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
-                if (((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
+                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = position + 0;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 0) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 0) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
+                if ((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
 
-                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = (int)(input - inputStart + 1);
-                if ((*(T *)(input + minLen - sizeof(T) + 1) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 1) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
-                if (((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
+                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = position + 1;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 1) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 1) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
+                if ((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
 
-                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = (int)(input - inputStart + 2);
-                if ((*(T *)(input + minLen - sizeof(T) + 2) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 2) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
-                if (((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
+                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = position + 2;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 2) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 2) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
+                if ((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
 
-                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = (int)(input - inputStart + 3);
-                if ((*(T *)(input + minLen - sizeof(T) + 3) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 3) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
-                if (((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
+                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = position + 3;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 3) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 3) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
+                if ((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
 
-                input += 4; output += 4;
+                const unsigned int index4 = (mix >> (0 * 8)) & mask; value = lookup[index4]; lookup[index4] = position + 4;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 4) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 4) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND5;
+                if (input[4] == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND5;
+
+                input += 5; output += 5;
 
                 continue;
             }
 
+LIBBSC_LZP_GOOD_MATCH_FOUND5:
+            input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND4:
             input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND3:
@@ -410,10 +451,12 @@ LIBBSC_LZP_GOOD_MATCH_FOUND2:
             input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND1:
 
+            if (value <= 0) { input += 1; output += 1; continue; }
+
             {
                 const unsigned char * RESTRICT reference = inputStart + value;
 
-                if (((heuristic - input) > 0) && (heuristic_v != *(unsigned long long *)(reference + (heuristic - input))))
+                if (((heuristic - input) > 0) && (heuristic_v != bsc_unaligned_load<unsigned long long>(reference + (heuristic - input))))
                 {
                     goto LIBBSC_LZP_MATCH_NOT_FOUND;
                 }
@@ -423,31 +466,33 @@ LIBBSC_LZP_GOOD_MATCH_FOUND1:
                 for (; input + len < inputMinLenEnd; len += sizeof(unsigned long long))
                 {
                     unsigned long long m;
-                    if ((m = (*(unsigned long long *)(input + len)) ^ *(unsigned long long *)(reference + len)) != 0) 
+                    if ((m = bsc_unaligned_load<unsigned long long>(input + len) ^ bsc_unaligned_load<unsigned long long>(reference + len)) != 0) 
                     {
                         len += bsc_bit_scan_forward64(m) / 8; break;
                     }
                 }
 
-                if (len < minLen) { heuristic = input + len; heuristic_v = *(unsigned long long *)heuristic; goto LIBBSC_LZP_MATCH_NOT_FOUND; }
+                if (len < minLen) { heuristic = input + len; heuristic_v = bsc_unaligned_load<unsigned long long>(heuristic); goto LIBBSC_LZP_MATCH_NOT_FOUND; }
 
                 input += len; len -= minLen;
 
-                *output++ = LIBBSC_LZP_MATCH_FLAG; while (len >= 254) { len -= 254; *output++ = 254; if (output >= outputEOB) break; } *output++ = (unsigned char)(len); 
+                *output++ = LIBBSC_LZP_MATCH_FLAG; while (len >= 254) { len -= 254; *output++ = 254; if (output >= outputEOB) break; } *output++ = (unsigned char)(len); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); 
             
                 continue;
             }
 
 LIBBSC_LZP_MATCH_NOT_FOUND:
-            input += 1; if (*output++ == LIBBSC_LZP_MATCH_FLAG) { *output++ = 255; } continue;
+            input += 1; if (*output++ == LIBBSC_LZP_MATCH_FLAG) { *output++ = 255; inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); } continue;
+LIBBSC_LZP_BAD_MATCH_FOUND5:
+            input += 5; output += 5; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND4:
-            input += 4; output += 4; *output++ = 255; continue;
+            input += 4; output += 4; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND3:
-            input += 3; output += 3; *output++ = 255; continue;
+            input += 3; output += 3; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND2:
-            input += 2; output += 2; *output++ = 255; continue;
+            input += 2; output += 2; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND1:
-            input += 1; output += 1; *output++ = 255; continue;
+            input += 1; output += 1; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
         }        
     }
     
@@ -480,40 +525,48 @@ int bsc_lzp_encode_large_fast_path(const unsigned char * RESTRICT input, const u
     const unsigned char * inputMinLenEnd = inputEnd - minLen - 32;
 
     const unsigned char * heuristic      = input;
-    unsigned long long    heuristic_v    = (input < inputMinLenEnd) ? *(unsigned long long *)heuristic : 0;
+    unsigned long long    heuristic_v    = (input < inputMinLenEnd) ? bsc_unaligned_load<unsigned long long>(heuristic) : 0;
 
     for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
     {
-        while ((input < inputMinLenEnd) && (output < outputEOB))
-        {
-            unsigned long long next8 = *(unsigned long long *)(input - 4); *(unsigned int *)(output) = (unsigned int)(next8 >> 32); next8 = bsc_byteswap_uint64(next8);
+        const unsigned char * inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB);
 
-            int value;
+        while (input < inputLimit)
+        {
+            unsigned long long next8 = bsc_unaligned_load<unsigned long long>(input - 4); memcpy(output, input, sizeof(unsigned long long)); next8 = bsc_byteswap_uint64(next8);
+
+            int value; const int position = (int)(input - inputStart);
             {
                 unsigned long long mix = (((next8 >> 12) ^ next8) >> 3) ^ next8;
 
-                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = (int)(input - inputStart + 0);
-                if ((*(T *)(input + minLen - sizeof(T) + 0) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 0) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
-                if (((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
+                const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = position + 0;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 0) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 0) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND1;
+                if ((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND1;
 
-                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = (int)(input - inputStart + 1);
-                if ((*(T *)(input + minLen - sizeof(T) + 1) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 1) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
-                if (((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
+                const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = position + 1;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 1) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 1) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND2;
+                if ((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND2;
 
-                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = (int)(input - inputStart + 2);
-                if ((*(T *)(input + minLen - sizeof(T) + 2) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 2) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
-                if (((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
+                const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = position + 2;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 2) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 2) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND3;
+                if ((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND3;
 
-                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = (int)(input - inputStart + 3);
-                if ((*(T *)(input + minLen - sizeof(T) + 3) == *(T *)(inputStart + value + minLen - sizeof(T))) && (value > 0) && (*(T *)(input + 3) == *(T *)(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
-                if (((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
+                const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = position + 3;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 3) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 3) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND4;
+                if ((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND4;
 
-                input += 4; output += 4;
+                const unsigned int index4 = (mix >> (0 * 8)) & mask; value = lookup[index4]; lookup[index4] = position + 4;
+                if ((bsc_unaligned_load<T>(input + minLen - sizeof(T) + 4) == bsc_unaligned_load<T>(inputStart + value + minLen - sizeof(T))) && (bsc_unaligned_load<T>(input + 4) == bsc_unaligned_load<T>(inputStart + value))) goto LIBBSC_LZP_GOOD_MATCH_FOUND5;
+                if (input[4] == LIBBSC_LZP_MATCH_FLAG) goto LIBBSC_LZP_BAD_MATCH_FOUND5;
+
+                input += 5; output += 5;
 
                 continue;
             }
 
+LIBBSC_LZP_GOOD_MATCH_FOUND5:
+            input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND4:
             input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND3:
@@ -522,44 +575,61 @@ LIBBSC_LZP_GOOD_MATCH_FOUND2:
             input += 1; output += 1;
 LIBBSC_LZP_GOOD_MATCH_FOUND1:
 
+            if (value <= 0) { input += 1; output += 1; continue; }
+
             {
                 const unsigned char * RESTRICT reference = inputStart + value;
 
-                if (((heuristic - input) > 0) && (heuristic_v != *(unsigned long long *)(reference + (heuristic - input))))
+                if (((heuristic - input) > 0) && (heuristic_v != bsc_unaligned_load<unsigned long long>(reference + (heuristic - input))))
                 {
                     goto LIBBSC_LZP_MATCH_NOT_FOUND;
                 }
 
                 long long len = sizeof(T);
 
+                for (; input + len + sizeof(unsigned long long) < inputMinLenEnd; len += 2 * sizeof(unsigned long long))
+                {
+                    const unsigned long long m0 = bsc_unaligned_load<unsigned long long>(input + len) ^ bsc_unaligned_load<unsigned long long>(reference + len);
+                    const unsigned long long m1 = bsc_unaligned_load<unsigned long long>(input + len + sizeof(unsigned long long)) ^ bsc_unaligned_load<unsigned long long>(reference + len + sizeof(unsigned long long));
+                    if ((m0 | m1) != 0)
+                    {
+                        const unsigned long long z = (m0 == 0);
+                        len += z * sizeof(unsigned long long) + bsc_bit_scan_forward64(m0 | (m1 & (0 - z))) / 8; goto LIBBSC_LZP_MATCH_EXTENDED;
+                    }
+                }
+
                 for (; input + len < inputMinLenEnd; len += sizeof(unsigned long long))
                 {
                     unsigned long long m;
-                    if ((m = (*(unsigned long long *)(input + len)) ^ *(unsigned long long *)(reference + len)) != 0) 
+                    if ((m = bsc_unaligned_load<unsigned long long>(input + len) ^ bsc_unaligned_load<unsigned long long>(reference + len)) != 0) 
                     {
                         len += bsc_bit_scan_forward64(m) / 8; break;
                     }
                 }
 
-                if (len < minLen) { heuristic = input + len; heuristic_v = *(unsigned long long *)heuristic; goto LIBBSC_LZP_MATCH_NOT_FOUND; }
+LIBBSC_LZP_MATCH_EXTENDED:
+
+                if (len < minLen) { heuristic = input + len; heuristic_v = bsc_unaligned_load<unsigned long long>(heuristic); goto LIBBSC_LZP_MATCH_NOT_FOUND; }
 
                 input += len; len -= minLen;
 
-                *output++ = LIBBSC_LZP_MATCH_FLAG; while (len >= 254) { len -= 254; *output++ = 254; if (output >= outputEOB) break; } *output++ = (unsigned char)(len); 
+                *output++ = LIBBSC_LZP_MATCH_FLAG; while (len >= 254) { len -= 254; *output++ = 254; if (output >= outputEOB) break; } *output++ = (unsigned char)(len); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); 
             
                 continue;
             }
 
 LIBBSC_LZP_MATCH_NOT_FOUND:
-            input += 1; if (*output++ == LIBBSC_LZP_MATCH_FLAG) { *output++ = 255; } continue;
+            input += 1; if (*output++ == LIBBSC_LZP_MATCH_FLAG) { *output++ = 255; inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); } continue;
+LIBBSC_LZP_BAD_MATCH_FOUND5:
+            input += 5; output += 5; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND4:
-            input += 4; output += 4; *output++ = 255; continue;
+            input += 4; output += 4; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND3:
-            input += 3; output += 3; *output++ = 255; continue;
+            input += 3; output += 3; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND2:
-            input += 2; output += 2; *output++ = 255; continue;
+            input += 2; output += 2; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
 LIBBSC_LZP_BAD_MATCH_FOUND1:
-            input += 1; output += 1; *output++ = 255; continue;
+            input += 1; output += 1; *output = 255; output += (value > 0); inputLimit = bsc_lzp_encode_limit(input, inputMinLenEnd, output, outputEOB); continue;
         }        
     }
     
@@ -602,17 +672,9 @@ int bsc_lzp_encode_generic(const unsigned char * RESTRICT input, const unsigned 
             if (value > 0)
             {
                 const unsigned char * RESTRICT reference = inputStart + value;
-#ifndef LIBBSC_NO_UNALIGNED_ACCESS
-                if ((*(unsigned int *)(input + minLen - 4) == *(unsigned int *)(reference + minLen - 4)) && (*(unsigned int *)(input) == *(unsigned int *)(reference)))
-#else
-                if ((memcmp(input + minLen - 4, reference + minLen - 4, sizeof(unsigned int)) == 0) && (memcmp(input, reference, sizeof(unsigned int)) == 0))
-#endif
+                if ((bsc_unaligned_load<unsigned int>(input + minLen - 4) == bsc_unaligned_load<unsigned int>(reference + minLen - 4)) && (bsc_unaligned_load<unsigned int>(input) == bsc_unaligned_load<unsigned int>(reference)))
                 {
-#ifndef LIBBSC_NO_UNALIGNED_ACCESS
-                    if ((heuristic > input) && (*(unsigned int *)heuristic != *(unsigned int *)(reference + (heuristic - input))))
-#else
-                    if ((heuristic > input) && (memcmp(heuristic, reference + (heuristic - input), sizeof(unsigned int)) != 0))
-#endif
+                    if ((heuristic > input) && (bsc_unaligned_load<unsigned int>(heuristic) != bsc_unaligned_load<unsigned int>(reference + (heuristic - input))))
                     {
                         goto LIBBSC_LZP_MATCH_NOT_FOUND;
                     }
@@ -620,23 +682,13 @@ int bsc_lzp_encode_generic(const unsigned char * RESTRICT input, const unsigned 
                     int len = 4;
                     for (; input + len < inputMinLenEnd; len += sizeof(unsigned int))
                     {
-#ifndef LIBBSC_NO_UNALIGNED_ACCESS
-                        if (*(unsigned int *)(input + len) != *(unsigned int *)(reference + len)) break;
-#else
-                        if (memcmp(input + len, reference + len, sizeof(unsigned int)) != 0) break;
-#endif
+                        if (bsc_unaligned_load<unsigned int>(input + len) != bsc_unaligned_load<unsigned int>(reference + len)) break;
                     }
 
                     if (len < minLen) { heuristic = input + len; goto LIBBSC_LZP_MATCH_NOT_FOUND; }
 
-#ifndef LIBBSC_NO_UNALIGNED_ACCESS
-                    len += sizeof(unsigned short) * (*(unsigned short *)(input + len) == *(unsigned short *)(reference + len));
+                    len += sizeof(unsigned short) * (bsc_unaligned_load<unsigned short>(input + len) == bsc_unaligned_load<unsigned short>(reference + len));
                     len += sizeof(unsigned char ) * (*(unsigned char  *)(input + len) == *(unsigned char  *)(reference + len));
-#else
-                    len += input[len] == reference[len];
-                    len += input[len] == reference[len];
-                    len += input[len] == reference[len];
-#endif
 
                     input += len; context = input[-1] | (input[-2] << 8) | (input[-3] << 16) | (input[-4] << 24);
 
@@ -687,7 +739,7 @@ int bsc_lzp_encode_block(const unsigned char * input, const unsigned char * inpu
     int result = LIBBSC_NOT_ENOUGH_MEMORY;
     if (int * lookup = table != NULL ? table : (int *)bsc_zero_malloc(((size_t)1 << hashSize) * sizeof(int)))
     {
-#if !defined(LIBBSC_NO_UNALIGNED_ACCESS) && (defined(LIBBSC_x86_64) || defined(LIBBSC_AArch64))
+#if defined(LIBBSC_x86_64) || defined(LIBBSC_AArch64)
         if (hashSize <= 17)
         {
             result = (minLen == 1 * (int)sizeof(unsigned int      ) && result == LIBBSC_NOT_ENOUGH_MEMORY) ? bsc_lzp_encode_small  <unsigned int      >(input, inputEnd, output, outputEnd, lookup, (int)(1 << hashSize) - 1) : result;
@@ -727,10 +779,11 @@ int bsc_lzp_decode_block(const unsigned char * RESTRICT input, const unsigned ch
 
         for (int i = 0; i < 4; ++i) { *output++ = *input++; }
 
-#if !defined(LIBBSC_NO_UNALIGNED_ACCESS) && (defined(LIBBSC_x86_64) || defined(LIBBSC_AArch64))
+#if defined(LIBBSC_x86_64) || defined(LIBBSC_AArch64)
         if (hashSize <= 17)
         {
-            unsigned int prev4 = *(unsigned int *)(output - 4);
+            unsigned int prev4 = bsc_unaligned_load<unsigned int>(output - 4);
+            int outputOffset = (int)(output - outputStart);
 
             while (input < inputEnd - 8)
             {
@@ -742,49 +795,45 @@ int bsc_lzp_decode_block(const unsigned char * RESTRICT input, const unsigned ch
                     {
                         _mm_storeu_si128((__m128i *)output, next16);
 
-                        unsigned long long lo8      = *(unsigned long long *)(input + 0);
-                        unsigned long long hi8      = *(unsigned long long *)(input + 8);
+                        unsigned long long lo8      = bsc_unaligned_load<unsigned long long>(input + 0);
 
                         unsigned long long next80   = bsc_byteswap_uint64((lo8 << 32) | prev4);
-                        unsigned long long next81   = bsc_byteswap_uint64(lo8);
-                        unsigned long long next82   = bsc_byteswap_uint64((hi8 << 32) | (lo8 >> 32));
-                        unsigned long long next83   = bsc_byteswap_uint64(hi8);
+                        unsigned long long next81   = bsc_byteswap_uint64(bsc_unaligned_load<unsigned long long>(input + 1));
+                        unsigned long long next82   = bsc_byteswap_uint64(bsc_unaligned_load<unsigned long long>(input + 6));
 
                         unsigned long long mix0     = (((next80 >> 12) ^ next80) >> 3) ^ next80;
                         unsigned long long mix1     = (((next81 >> 12) ^ next81) >> 3) ^ next81;
                         unsigned long long mix2     = (((next82 >> 12) ^ next82) >> 3) ^ next82;
-                        unsigned long long mix3     = (((next83 >> 12) ^ next83) >> 3) ^ next83;
 
-                        lookup[(mix0 >> (4 * 8)) & mask] = (int)(output - outputStart +  0);
-                        lookup[(mix0 >> (3 * 8)) & mask] = (int)(output - outputStart +  1);
-                        lookup[(mix0 >> (2 * 8)) & mask] = (int)(output - outputStart +  2);
-                        lookup[(mix0 >> (1 * 8)) & mask] = (int)(output - outputStart +  3);
-                        lookup[(mix1 >> (4 * 8)) & mask] = (int)(output - outputStart +  4);
-                        lookup[(mix1 >> (3 * 8)) & mask] = (int)(output - outputStart +  5);
-                        lookup[(mix1 >> (2 * 8)) & mask] = (int)(output - outputStart +  6);
-                        lookup[(mix1 >> (1 * 8)) & mask] = (int)(output - outputStart +  7);
-                        lookup[(mix2 >> (4 * 8)) & mask] = (int)(output - outputStart +  8);
-                        lookup[(mix2 >> (3 * 8)) & mask] = (int)(output - outputStart +  9);
-                        lookup[(mix2 >> (2 * 8)) & mask] = (int)(output - outputStart + 10);
-                        lookup[(mix2 >> (1 * 8)) & mask] = (int)(output - outputStart + 11);
-                        lookup[(mix3 >> (4 * 8)) & mask] = (int)(output - outputStart + 12);
-                        lookup[(mix3 >> (3 * 8)) & mask] = (int)(output - outputStart + 13);
-                        lookup[(mix3 >> (2 * 8)) & mask] = (int)(output - outputStart + 14);
-                        lookup[(mix3 >> (1 * 8)) & mask] = (int)(output - outputStart + 15);
+                        lookup[(mix0 >> (4 * 8)) & mask] = outputOffset +  0;
+                        lookup[(mix0 >> (3 * 8)) & mask] = outputOffset +  1;
+                        lookup[(mix0 >> (2 * 8)) & mask] = outputOffset +  2;
+                        lookup[(mix0 >> (1 * 8)) & mask] = outputOffset +  3;
+                        lookup[(mix0 >> (0 * 8)) & mask] = outputOffset +  4;
+                        lookup[(mix1 >> (4 * 8)) & mask] = outputOffset +  5;
+                        lookup[(mix1 >> (3 * 8)) & mask] = outputOffset +  6;
+                        lookup[(mix1 >> (2 * 8)) & mask] = outputOffset +  7;
+                        lookup[(mix1 >> (1 * 8)) & mask] = outputOffset +  8;
+                        lookup[(mix1 >> (0 * 8)) & mask] = outputOffset +  9;
+                        lookup[(mix2 >> (4 * 8)) & mask] = outputOffset + 10;
+                        lookup[(mix2 >> (3 * 8)) & mask] = outputOffset + 11;
+                        lookup[(mix2 >> (2 * 8)) & mask] = outputOffset + 12;
+                        lookup[(mix2 >> (1 * 8)) & mask] = outputOffset + 13;
+                        lookup[(mix2 >> (0 * 8)) & mask] = outputOffset + 14;
 
-                        prev4 = (unsigned int)(hi8 >> 32); input += 16; output += 16;
+                        prev4 = bsc_unaligned_load<unsigned int>(input + 11); input += 15; output += 15; outputOffset += 15;
 
                         continue;
                     }
                 }
 #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_A64
                 {
-                    unsigned long long next8    = *(unsigned long long *)(input);
+                    unsigned long long next8    = bsc_unaligned_load<unsigned long long>(input);
                     unsigned long long flags    = next8 ^ (LIBBSC_LZP_MATCH_FLAG * 0x0101010101010101ull);
 
                     if (((flags - 0x0101010101010101ull) & ~flags & 0x8080808080808080ull) == 0)
                     {
-                        *(unsigned long long *)(output) = next8;
+                        bsc_unaligned_store<unsigned long long>(output, next8);
 
                         unsigned long long next80   = bsc_byteswap_uint64((next8 << 32) | prev4);
                         unsigned long long next81   = bsc_byteswap_uint64(next8);
@@ -792,23 +841,23 @@ int bsc_lzp_decode_block(const unsigned char * RESTRICT input, const unsigned ch
                         unsigned long long mix0     = (((next80 >> 12) ^ next80) >> 3) ^ next80;
                         unsigned long long mix1     = (((next81 >> 12) ^ next81) >> 3) ^ next81;
 
-                        lookup[(mix0 >> (4 * 8)) & mask] = (int)(output - outputStart + 0);
-                        lookup[(mix0 >> (3 * 8)) & mask] = (int)(output - outputStart + 1);
-                        lookup[(mix0 >> (2 * 8)) & mask] = (int)(output - outputStart + 2);
-                        lookup[(mix0 >> (1 * 8)) & mask] = (int)(output - outputStart + 3);
-                        lookup[(mix1 >> (4 * 8)) & mask] = (int)(output - outputStart + 4);
-                        lookup[(mix1 >> (3 * 8)) & mask] = (int)(output - outputStart + 5);
-                        lookup[(mix1 >> (2 * 8)) & mask] = (int)(output - outputStart + 6);
-                        lookup[(mix1 >> (1 * 8)) & mask] = (int)(output - outputStart + 7);
+                        lookup[(mix0 >> (4 * 8)) & mask] = outputOffset + 0;
+                        lookup[(mix0 >> (3 * 8)) & mask] = outputOffset + 1;
+                        lookup[(mix0 >> (2 * 8)) & mask] = outputOffset + 2;
+                        lookup[(mix0 >> (1 * 8)) & mask] = outputOffset + 3;
+                        lookup[(mix1 >> (4 * 8)) & mask] = outputOffset + 4;
+                        lookup[(mix1 >> (3 * 8)) & mask] = outputOffset + 5;
+                        lookup[(mix1 >> (2 * 8)) & mask] = outputOffset + 6;
+                        lookup[(mix1 >> (1 * 8)) & mask] = outputOffset + 7;
 
-                        prev4 = (unsigned int)(next8 >> 32); input += 8; output += 8;
+                        prev4 = (unsigned int)(next8 >> 32); input += 8; output += 8; outputOffset += 8;
 
                         continue;
                     }
                 }
 #endif
 
-                unsigned int next4          = *(unsigned int *)(output) = *(unsigned int *)(input);
+                unsigned int next4          = bsc_unaligned_load<unsigned int>(input); bsc_unaligned_store<unsigned int>(output, next4);
                 unsigned long long next8    = bsc_byteswap_uint64(((unsigned long long)next4 << 32) | prev4);
 
                 int value;
@@ -818,29 +867,29 @@ int bsc_lzp_decode_block(const unsigned char * RESTRICT input, const unsigned ch
                     const unsigned int flags = next4 ^ (LIBBSC_LZP_MATCH_FLAG * 0x01010101u);
                     if (((flags - 0x01010101u) & ~flags & 0x80808080u) == 0)
                     {
-                        lookup[(mix >> (4 * 8)) & mask] = (int)(output - outputStart + 0);
-                        lookup[(mix >> (3 * 8)) & mask] = (int)(output - outputStart + 1);
-                        lookup[(mix >> (2 * 8)) & mask] = (int)(output - outputStart + 2);
-                        lookup[(mix >> (1 * 8)) & mask] = (int)(output - outputStart + 3);
+                        lookup[(mix >> (4 * 8)) & mask] = outputOffset + 0;
+                        lookup[(mix >> (3 * 8)) & mask] = outputOffset + 1;
+                        lookup[(mix >> (2 * 8)) & mask] = outputOffset + 2;
+                        lookup[(mix >> (1 * 8)) & mask] = outputOffset + 3;
 
-                        prev4 = next4; input += 4; output += 4;
+                        prev4 = next4; input += 4; output += 4; outputOffset += 4;
 
                         continue;
                     }
 
-                    const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = (int)(output - outputStart + 0);
+                    const unsigned int index0 = (mix >> (4 * 8)) & mask; value = lookup[index0]; lookup[index0] = outputOffset + 0;
                     if (((unsigned char)(next8 >> 3 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_MATCH_FOUND1;
 
-                    const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = (int)(output - outputStart + 1);
+                    const unsigned int index1 = (mix >> (3 * 8)) & mask; value = lookup[index1]; lookup[index1] = outputOffset + 1;
                     if (((unsigned char)(next8 >> 2 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_MATCH_FOUND2;
 
-                    const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = (int)(output - outputStart + 2);
+                    const unsigned int index2 = (mix >> (2 * 8)) & mask; value = lookup[index2]; lookup[index2] = outputOffset + 2;
                     if (((unsigned char)(next8 >> 1 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_MATCH_FOUND3;
 
-                    const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = (int)(output - outputStart + 3);
+                    const unsigned int index3 = (mix >> (1 * 8)) & mask; value = lookup[index3]; lookup[index3] = outputOffset + 3;
                     if (((unsigned char)(next8 >> 0 * 8) == LIBBSC_LZP_MATCH_FLAG) && (value > 0)) goto LIBBSC_LZP_MATCH_FOUND4;
 
-                    prev4 = next4; input += 4; output += 4;
+                    prev4 = next4; input += 4; output += 4; outputOffset += 4;
 
                     continue;
                 }
@@ -866,16 +915,23 @@ LIBBSC_LZP_MATCH_FOUND1:
                         while (output < outputEnd - 8) { memcpy(output, reference, 8); output += 8; reference += 8; }
                         memcpy(outputEnd - 8, outputEnd - 8 - (output - reference), 8); output = outputEnd;
                     }
+                    else if (output - reference == 1 && len >= 8)
+                    {
+                        unsigned long long fill = output[-1]; fill |= fill << 8; fill |= fill << 16; fill |= fill << 32;
+
+                        while (output < outputEnd - 8) { bsc_unaligned_store<unsigned long long>(output, fill); output += 8; }
+                        bsc_unaligned_store<unsigned long long>(outputEnd - 8, fill); output = outputEnd;
+                    }
                     else
                     {
                         while (output < outputEnd) { *output++ = *reference++; }
                     }
 
-                    prev4 = *(unsigned int *)(output - 4);
+                    prev4 = bsc_unaligned_load<unsigned int>(output - 4); outputOffset = (int)(output - outputStart);
                 }
                 else
                 {
-                    input++; output++; prev4 = *(unsigned int *)(output - 4); 
+                    input++; output++; prev4 = bsc_unaligned_load<unsigned int>(output - 4); outputOffset = (int)(output - outputStart);
                 }
             }
         }
@@ -886,7 +942,6 @@ LIBBSC_LZP_MATCH_FOUND1:
 
             while (input < inputEnd)
             {
-#if !defined(LIBBSC_NO_UNALIGNED_ACCESS)
 #if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE2
                 if (input < inputEnd - 16)
                 {
@@ -895,10 +950,10 @@ LIBBSC_LZP_MATCH_FOUND1:
                     {
                         _mm_storeu_si128((__m128i *)output, next16);
 
-                        unsigned long long next81   = bsc_byteswap_uint64(*(unsigned long long *)(input + 0));
+                        unsigned long long next81   = bsc_byteswap_uint64(bsc_unaligned_load<unsigned long long>(input + 0));
                         unsigned long long next80   = ((unsigned long long)context << 32) | (next81 >> 32);
-                        unsigned long long next82   = bsc_byteswap_uint64(*(unsigned long long *)(input + 4));
-                        unsigned long long next83   = bsc_byteswap_uint64(*(unsigned long long *)(input + 8));
+                        unsigned long long next82   = bsc_byteswap_uint64(bsc_unaligned_load<unsigned long long>(input + 4));
+                        unsigned long long next83   = bsc_byteswap_uint64(bsc_unaligned_load<unsigned long long>(input + 8));
 
                         const unsigned int context0  = (unsigned int)(next80 >> (4 * 8)); lookup[((context0 >> 15) ^ context0 ^ (context0 >> 3)) & mask] = (int)(output - outputStart +  0);
                         const unsigned int context1  = (unsigned int)(next80 >> (3 * 8)); lookup[((context1 >> 15) ^ context1 ^ (context1 >> 3)) & mask] = (int)(output - outputStart +  1);
@@ -925,12 +980,12 @@ LIBBSC_LZP_MATCH_FOUND1:
 #elif LIBBSC_CPU_FEATURE == LIBBSC_CPU_FEATURE_A64
                 if (input < inputEnd - 8)
                 {
-                    unsigned long long next8    = *(unsigned long long *)(input);
+                    unsigned long long next8    = bsc_unaligned_load<unsigned long long>(input);
                     unsigned long long flags    = next8 ^ (LIBBSC_LZP_MATCH_FLAG * 0x0101010101010101ull);
 
                     if (((flags - 0x0101010101010101ull) & ~flags & 0x8080808080808080ull) == 0)
                     {
-                        *(unsigned long long *)(output) = next8;
+                        bsc_unaligned_store<unsigned long long>(output, next8);
 
                         unsigned long long next81   = bsc_byteswap_uint64(next8);
                         unsigned long long next80   = ((unsigned long long)context << 32) | (next81 >> 32);
@@ -949,7 +1004,6 @@ LIBBSC_LZP_MATCH_FOUND1:
                         continue;
                     }
                 }
-#endif
 #endif
 
                 unsigned int index = ((context >> 15) ^ context ^ (context >> 3)) & mask;
@@ -1021,8 +1075,8 @@ int bsc_lzp_compress_serial(const unsigned char * input, unsigned char * output,
             result = inputSize; memcpy(output + outputPtr, input + inputStart, inputSize);
         }
 
-        memcpy(output + 1 + 8 * blockId + 0, &inputSize, sizeof(int));
-        memcpy(output + 1 + 8 * blockId + 4, &result, sizeof(int));
+        bsc_unaligned_store<int>(output + 1 + 8 * blockId + 0, inputSize);
+        bsc_unaligned_store<int>(output + 1 + 8 * blockId + 4, result);
 
         outputPtr += result;
     }
@@ -1081,8 +1135,8 @@ int bsc_lzp_compress_parallel(const unsigned char * input, unsigned char * outpu
 
                 for (int p = 0; p < blockId; ++p) { outputPtr += compressionResult[p]; }
 
-                memcpy(output + 1 + 8 * blockId + 0, &blockSize, sizeof(int));
-                memcpy(output + 1 + 8 * blockId + 4, &compressionResult[blockId], sizeof(int));
+                bsc_unaligned_store<int>(output + 1 + 8 * blockId + 0, blockSize);
+                bsc_unaligned_store<int>(output + 1 + 8 * blockId + 4, compressionResult[blockId]);
                 memcpy(output + outputPtr, buffer + blockStart, compressionResult[blockId]);
             }
         }
@@ -1163,14 +1217,14 @@ int bsc_lzp_decompress(const unsigned char * input, unsigned char * output, int 
 
             for (int p = 0; p < blockId; ++p)
             {
-                memcpy(&inputSize , input + 1 + 8 * p + 4, sizeof(int));
-                memcpy(&outputSize, input + 1 + 8 * p + 0, sizeof(int));
+                inputSize  = bsc_unaligned_load<int>(input + 1 + 8 * p + 4);
+                outputSize = bsc_unaligned_load<int>(input + 1 + 8 * p + 0);
 
                 inputPtr += inputSize; outputPtr += outputSize;
             }
 
-            memcpy(&inputSize , input + 1 + 8 * blockId + 4, sizeof(int));
-            memcpy(&outputSize, input + 1 + 8 * blockId + 0, sizeof(int));
+            inputSize  = bsc_unaligned_load<int>(input + 1 + 8 * blockId + 4);
+            outputSize = bsc_unaligned_load<int>(input + 1 + 8 * blockId + 0);
 
             if (inputSize != outputSize)
             {
@@ -1196,7 +1250,7 @@ int bsc_lzp_decompress(const unsigned char * input, unsigned char * output, int 
 
     if (pendingBlocks > 0)
     {
-        int chunkSize; memcpy(&chunkSize, input + 1, sizeof(int));
+        int chunkSize = bsc_unaligned_load<int>(input + 1);
 
         size_t  tableSize = ((size_t)1 << hashSize) * sizeof(int);
         int *   table     = tableSize <= (size_t)chunkSize ? (int *)bsc_zero_malloc(tableSize) : NULL;
@@ -1213,14 +1267,14 @@ int bsc_lzp_decompress(const unsigned char * input, unsigned char * output, int 
 
             for (int p = 0; p < blockId; ++p)
             {
-                memcpy(&inputSize , input + 1 + 8 * p + 4, sizeof(int));
-                memcpy(&outputSize, input + 1 + 8 * p + 0, sizeof(int));
+                inputSize  = bsc_unaligned_load<int>(input + 1 + 8 * p + 4);
+                outputSize = bsc_unaligned_load<int>(input + 1 + 8 * p + 0);
 
                 inputPtr += inputSize; outputPtr += outputSize;
             }
 
-            memcpy(&inputSize , input + 1 + 8 * blockId + 4, sizeof(int));
-            memcpy(&outputSize, input + 1 + 8 * blockId + 0, sizeof(int));
+            inputSize  = bsc_unaligned_load<int>(input + 1 + 8 * blockId + 4);
+            outputSize = bsc_unaligned_load<int>(input + 1 + 8 * blockId + 0);
 
             if (inputSize != outputSize)
             {

@@ -110,12 +110,17 @@ unsigned int ADLER32_FUNCTION_NAME (const unsigned char * T, int n, int features
 
         __m256i v_ps  = _mm256_set_epi32(0, 0, 0, 0, 0, 0, 0, sum1 * (NMAX / 64));
         __m256i v_s2  = _mm256_setzero_si256();
+        __m256i v_s2b = _mm256_setzero_si256();
+        __m256i v_s2c = _mm256_setzero_si256();
+        __m256i v_s2d = _mm256_setzero_si256();
         __m256i v_s1  = _mm256_setzero_si256();
 
-        for (int i = 0; i < NMAX / 64; ++i)
+        for (int i = 0; i < NMAX / 128; ++i)
         {
             const __m256i bytes1 = _mm256_load_si256((const __m256i *)(T));
             const __m256i bytes2 = _mm256_load_si256((const __m256i *)(T + 32));
+            const __m256i bytes3 = _mm256_load_si256((const __m256i *)(T + 64));
+            const __m256i bytes4 = _mm256_load_si256((const __m256i *)(T + 96));
 
             v_ps = _mm256_add_epi32(v_ps, v_s1);
 
@@ -123,12 +128,20 @@ unsigned int ADLER32_FUNCTION_NAME (const unsigned char * T, int n, int features
             v_s2 = _mm256_add_epi32(v_s2, _mm256_madd_epi16(_mm256_maddubs_epi16(bytes1, tap1), ones));
 
             v_s1 = _mm256_add_epi32(v_s1, _mm256_sad_epu8(bytes2, zero));
-            v_s2 = _mm256_add_epi32(v_s2, _mm256_madd_epi16(_mm256_maddubs_epi16(bytes2, tap2), ones));
+            v_s2b = _mm256_add_epi32(v_s2b, _mm256_madd_epi16(_mm256_maddubs_epi16(bytes2, tap2), ones));
 
-            T += 64;
+            v_ps = _mm256_add_epi32(v_ps, v_s1);
+
+            v_s1 = _mm256_add_epi32(v_s1, _mm256_sad_epu8(bytes3, zero));
+            v_s2c = _mm256_add_epi32(v_s2c, _mm256_madd_epi16(_mm256_maddubs_epi16(bytes3, tap1), ones));
+
+            v_s1 = _mm256_add_epi32(v_s1, _mm256_sad_epu8(bytes4, zero));
+            v_s2d = _mm256_add_epi32(v_s2d, _mm256_madd_epi16(_mm256_maddubs_epi16(bytes4, tap2), ones));
+
+            T += 128;
         }
 
-        v_s2 = _mm256_add_epi32(v_s2, _mm256_slli_epi32(v_ps, 6));
+        v_s2 = _mm256_add_epi32(_mm256_add_epi32(_mm256_add_epi32(v_s2, v_s2b), _mm256_add_epi32(v_s2c, v_s2d)), _mm256_slli_epi32(v_ps, 6));
 
         __m128i hv_s1 = _mm_add_epi32(_mm256_castsi256_si128(v_s1), _mm256_extracti128_si256(v_s1, 1));
         hv_s1 = _mm_add_epi32(hv_s1, _mm_shuffle_epi32(hv_s1, _MM_SHUFFLE(2, 3, 0, 1)));

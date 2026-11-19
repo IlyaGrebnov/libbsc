@@ -228,14 +228,11 @@ int bsc_detect_segments_parallel(BscSegmentationModel * RESTRICT model0, BscSegm
                     }
                 }
 
-                if (globalBestEntropy > localBestEntropy)
+                #pragma omp critical
                 {
-                    #pragma omp critical
+                    if (globalBestEntropy > localBestEntropy)
                     {
-                        if (globalBestEntropy > localBestEntropy)
-                        {
-                            globalBlockSize = localBlockSize; globalBestEntropy = localBestEntropy;
-                        }
+                        globalBlockSize = localBlockSize; globalBestEntropy = localBestEntropy;
                     }
                 }
             }
@@ -359,6 +356,8 @@ static long long bsc_estimate_contextsorder(const unsigned char * input, int n)
 
 int bsc_detect_contextsorder(const unsigned char * RESTRICT input, int n, int features)
 {
+    if (n < 2) return LIBBSC_CONTEXTS_FOLLOWING;
+
     int sortingContexts = LIBBSC_NOT_ENOUGH_MEMORY;
 
     if ((n > DETECTORS_NUM_BLOCKS * DETECTORS_BLOCK_SIZE) && (features & LIBBSC_FEATURE_FASTMODE))

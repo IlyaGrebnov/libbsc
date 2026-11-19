@@ -43,21 +43,39 @@ See also the bsc and libbsc web site:
 #include "../coder/coder.h"
 #include "../st/st.h"
 
-/* The block header can be at any address (e.g. a block inside a larger buffer), so it is */
-/* accessed with memcpy. Casting it to int * is undefined behavior, and on strict-alignment */
-/* targets such as 32-bit ARM the compiler can merge such accesses into ldm/ldrd, which fault */
-/* (SIGBUS) on unaligned addresses. */
-static INLINE int bsc_load_int(const unsigned char * p)
-{
-    int v; memcpy(&v, p, sizeof(v)); return v;
-}
-
-static INLINE void bsc_store_int(unsigned char * p, int v)
-{
-    memcpy(p, &v, sizeof(v));
-}
-
 #define LIBBSC_COPY_MIN_BLOCK_SIZE (1024 * 1024)
+
+#ifdef LIBBSC_OPENMP
+
+static INLINE int bsc_memcpy_num_threads(int n)
+{
+    struct entry { int threads; int threshold; };
+
+    static const struct entry break_points[] =
+    {
+        { 128, 128 * 128 * 65536 },
+        {  96,  96 *  96 * 65536 },
+        {  64,  64 *  64 * 65536 },
+        {  48,  48 *  48 * 65536 },
+        {  32,  32 *  32 * 65536 },
+        {  24,  24 *  24 * 65536 },
+        {  16,  16 *  16 * 65536 },
+        {  12,  12 *  12 * 65536 },
+        {   8,   8 *   8 * 65536 },
+        {   6,   6 *   6 * 65536 },
+        {   4,   4 *   4 * 65536 },
+        {   2,   2 *   2 * 65536 },
+    };
+
+    for (int i = 0; i < sizeof(break_points) / sizeof(break_points[0]); i += 1)
+    {
+        if (n >= break_points[i].threshold) { return break_points[i].threads; }
+    }
+
+    return 1;
+}
+
+#endif
 
 static void bsc_memcpy(unsigned char * destination, const unsigned char * source, int n, int features)
 {
@@ -68,6 +86,7 @@ static void bsc_memcpy(unsigned char * destination, const unsigned char * source
     {
         int numThreads = omp_get_max_threads() / omp_get_num_threads();
         if (numThreads > n / LIBBSC_COPY_MIN_BLOCK_SIZE) numThreads = n / LIBBSC_COPY_MIN_BLOCK_SIZE;
+        if (numThreads > bsc_memcpy_num_threads(n)) numThreads = bsc_memcpy_num_threads(n);
 
         if (numThreads > 1)
         {
@@ -121,13 +140,13 @@ int bsc_store(const unsigned char * input, unsigned char * output, int n, int fe
     unsigned int adler32_data = bsc_adler32(input, n, features);
 
     memmove(output + LIBBSC_HEADER_SIZE, input, n);
-    bsc_store_int(output +  0, n + LIBBSC_HEADER_SIZE);
-    bsc_store_int(output +  4, n);
-    bsc_store_int(output +  8, 0);
-    bsc_store_int(output + 12, 0);
-    bsc_store_int(output + 16, adler32_data);
-    bsc_store_int(output + 20, adler32_data);
-    bsc_store_int(output + 24, bsc_adler32(output, 24, features));
+    bsc_unaligned_store<int>(output +  0, n + LIBBSC_HEADER_SIZE);
+    bsc_unaligned_store<int>(output +  4, n);
+    bsc_unaligned_store<int>(output +  8, 0);
+    bsc_unaligned_store<int>(output + 12, 0);
+    bsc_unaligned_store<int>(output + 16, adler32_data);
+    bsc_unaligned_store<int>(output + 20, adler32_data);
+    bsc_unaligned_store<int>(output + 24, bsc_adler32(output, 24, features));
     return n + LIBBSC_HEADER_SIZE;
 }
 
@@ -222,11 +241,12 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
         return index;
     }
 
-    if (unsigned char * buffer = (unsigned char *)bsc_malloc(lzSize + 4096))
     {
-        int result = bsc_coder_compress(data, buffer, lzSize, coder, features);
-        if (result >= LIBBSC_NO_ERROR) bsc_memcpy(data + LIBBSC_HEADER_SIZE, buffer, result, features);
-        bsc_free(buffer);
+        int result = bsc_coder_compress(data, data + LIBBSC_HEADER_SIZE, lzSize, coder, features);
+        if (result == LIBBSC_NOT_ENOUGH_MEMORY)
+        {
+            return LIBBSC_NOT_ENOUGH_MEMORY;
+        }
         if ((result < LIBBSC_NO_ERROR) || (result + 1 + 4 * num_indexes >= n))
         {
             return LIBBSC_NOT_COMPRESSIBLE;
@@ -239,17 +259,15 @@ int bsc_compress_inplace(unsigned char * data, int n, int lzpHashSize, int lzpMi
             data[LIBBSC_HEADER_SIZE + result + 4 * num_indexes] = num_indexes;
             result += 1 + 4 * num_indexes;
         }
-        bsc_store_int(data +  0, result + LIBBSC_HEADER_SIZE);
-        bsc_store_int(data +  4, n);
-        bsc_store_int(data +  8, mode);
-        bsc_store_int(data + 12, index);
-        bsc_store_int(data + 16, adler32_data);
-        bsc_store_int(data + 20, bsc_adler32(data + LIBBSC_HEADER_SIZE, result, features));
-        bsc_store_int(data + 24, bsc_adler32(data, 24, features));
+        bsc_unaligned_store<int>(data +  0, result + LIBBSC_HEADER_SIZE);
+        bsc_unaligned_store<int>(data +  4, n);
+        bsc_unaligned_store<int>(data +  8, mode);
+        bsc_unaligned_store<int>(data + 12, index);
+        bsc_unaligned_store<int>(data + 16, adler32_data);
+        bsc_unaligned_store<int>(data + 20, bsc_adler32(data + LIBBSC_HEADER_SIZE, result, features));
+        bsc_unaligned_store<int>(data + 24, bsc_adler32(data, 24, features));
         return result + LIBBSC_HEADER_SIZE;
     }
-
-    return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
 int bsc_compress(const unsigned char * input, unsigned char * output, int n, int lzpHashSize, int lzpMinLen, int blockSorter, int coder, int features)
@@ -349,11 +367,12 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
         return index;
     }
 
-    if (unsigned char * buffer = (unsigned char *)bsc_malloc(lzSize + 4096))
     {
-        int result = bsc_coder_compress(output, buffer, lzSize, coder, features);
-        if (result >= LIBBSC_NO_ERROR) bsc_memcpy(output + LIBBSC_HEADER_SIZE, buffer, result, features);
-        bsc_free(buffer);
+        int result = bsc_coder_compress(output, output + LIBBSC_HEADER_SIZE, lzSize, coder, features);
+        if (result == LIBBSC_NOT_ENOUGH_MEMORY)
+        {
+            return LIBBSC_NOT_ENOUGH_MEMORY;
+        }
         if ((result < LIBBSC_NO_ERROR) || (result + 1 + 4 * num_indexes >= n))
         {
             return bsc_store(input, output, n, features);
@@ -366,17 +385,15 @@ int bsc_compress(const unsigned char * input, unsigned char * output, int n, int
             output[LIBBSC_HEADER_SIZE + result + 4 * num_indexes] = num_indexes;
             result += 1 + 4 * num_indexes;
         }
-        bsc_store_int(output +  0, result + LIBBSC_HEADER_SIZE);
-        bsc_store_int(output +  4, n);
-        bsc_store_int(output +  8, mode);
-        bsc_store_int(output + 12, index);
-        bsc_store_int(output + 16, bsc_adler32(input, n, features));
-        bsc_store_int(output + 20, bsc_adler32(output + LIBBSC_HEADER_SIZE, result, features));
-        bsc_store_int(output + 24, bsc_adler32(output, 24, features));
+        bsc_unaligned_store<int>(output +  0, result + LIBBSC_HEADER_SIZE);
+        bsc_unaligned_store<int>(output +  4, n);
+        bsc_unaligned_store<int>(output +  8, mode);
+        bsc_unaligned_store<int>(output + 12, index);
+        bsc_unaligned_store<int>(output + 16, bsc_adler32(input, n, features));
+        bsc_unaligned_store<int>(output + 20, bsc_adler32(output + LIBBSC_HEADER_SIZE, result, features));
+        bsc_unaligned_store<int>(output + 24, bsc_adler32(output, 24, features));
         return result + LIBBSC_HEADER_SIZE;
     }
-
-    return LIBBSC_NOT_ENOUGH_MEMORY;
 }
 
 int bsc_block_info(const unsigned char * blockHeader, int headerSize, int * pBlockSize, int * pDataSize, int features)
@@ -386,15 +403,15 @@ int bsc_block_info(const unsigned char * blockHeader, int headerSize, int * pBlo
         return LIBBSC_UNEXPECTED_EOB;
     }
 
-    if ((unsigned int)bsc_load_int(blockHeader + 24) != bsc_adler32(blockHeader, 24, features))
+    if ((unsigned int)bsc_unaligned_load<int>(blockHeader + 24) != bsc_adler32(blockHeader, 24, features))
     {
         return LIBBSC_DATA_CORRUPT;
     }
 
-    int blockSize    = bsc_load_int(blockHeader +  0);
-    int dataSize     = bsc_load_int(blockHeader +  4);
-    int mode         = bsc_load_int(blockHeader +  8);
-    int index        = bsc_load_int(blockHeader + 12);
+    int blockSize    = bsc_unaligned_load<int>(blockHeader +  0);
+    int dataSize     = bsc_unaligned_load<int>(blockHeader +  4);
+    int mode         = bsc_unaligned_load<int>(blockHeader +  8);
+    int index        = bsc_unaligned_load<int>(blockHeader + 12);
 
     int lzpHashSize  = (mode >> 16) & 0xff;
     int lzpMinLen    = (mode >>  8) & 0xff;
@@ -477,20 +494,20 @@ int bsc_decompress_inplace(unsigned char * data, int inputSize, int outputSize, 
         return LIBBSC_UNEXPECTED_EOB;
     }
 
-    if ((unsigned int)bsc_load_int(data + 20) != bsc_adler32(data + LIBBSC_HEADER_SIZE, blockSize - LIBBSC_HEADER_SIZE, features))
+    if ((unsigned int)bsc_unaligned_load<int>(data + 20) != bsc_adler32(data + LIBBSC_HEADER_SIZE, blockSize - LIBBSC_HEADER_SIZE, features))
     {
         return LIBBSC_DATA_CORRUPT;
     }
 
-    int mode = bsc_load_int(data + 8);
+    int mode = bsc_unaligned_load<int>(data + 8);
     if (mode == 0)
     {
         memmove(data, data + LIBBSC_HEADER_SIZE, dataSize);
         return LIBBSC_NO_ERROR;
     }
 
-    int             index           = bsc_load_int(data + 12);
-    unsigned int    adler32_data    = bsc_load_int(data + 16);
+    int             index           = bsc_unaligned_load<int>(data + 12);
+    unsigned int    adler32_data    = bsc_unaligned_load<int>(data + 16);
 
     num_indexes = data[blockSize - 1];
     if (num_indexes > 0)
@@ -586,20 +603,20 @@ int bsc_decompress(const unsigned char * input, int inputSize, unsigned char * o
         return LIBBSC_UNEXPECTED_EOB;
     }
 
-    if ((unsigned int)bsc_load_int(input + 20) != bsc_adler32(input + LIBBSC_HEADER_SIZE, blockSize - LIBBSC_HEADER_SIZE, features))
+    if ((unsigned int)bsc_unaligned_load<int>(input + 20) != bsc_adler32(input + LIBBSC_HEADER_SIZE, blockSize - LIBBSC_HEADER_SIZE, features))
     {
         return LIBBSC_DATA_CORRUPT;
     }
 
-    int mode = bsc_load_int(input + 8);
+    int mode = bsc_unaligned_load<int>(input + 8);
     if (mode == 0)
     {
         bsc_memcpy(output, input + LIBBSC_HEADER_SIZE, dataSize, features);
         return LIBBSC_NO_ERROR;
     }
 
-    int             index           = bsc_load_int(input + 12);
-    unsigned int    adler32_data    = bsc_load_int(input + 16);
+    int             index           = bsc_unaligned_load<int>(input + 12);
+    unsigned int    adler32_data    = bsc_unaligned_load<int>(input + 16);
 
     num_indexes = input[blockSize - 1];
     if (num_indexes > 0)

@@ -50,17 +50,11 @@ public:
         probability = probability - ((bit ? delta1 : delta0) >> 12);
     }
 
-    static INLINE void UpdateBitEncode(unsigned int bit, short & probability, const int threshold0, const int adaptationRate0, const int threshold1, const int adaptationRate1)
+    static INLINE void UpdateBit(short & probability, const int * update)
     {
-        int delta0 = probability * adaptationRate0 - ((4096 - threshold0) * adaptationRate0 - 4095);
-        int delta1 = probability * adaptationRate1 - (threshold1 * adaptationRate1);
-
-#if defined(__GNUC__) && !defined(__clang__)
-        probability = probability - ((delta0 + ((delta1 - delta0) & (0 - (int)bit))) >> 12);
-#else
-        probability = probability - ((bit ? delta1 : delta0) >> 12);
-#endif
+        probability = probability - ((probability * update[0] - update[1]) >> 12);
     }
+
 
     static INLINE void UpdateBit0(short & probability, const int threshold, const int adaptationRate)
     {
@@ -72,9 +66,40 @@ public:
         probability = probability - (((probability - threshold) * adaptationRate) >> 12);
     };
 
+    /* Two adjacent entries in 16-bit lanes: the mixer's map values stay within [-271, 4299] and its rates below 2048, so the */
+    /* differences and 16 * adaptationRate fit 16 bits and the multiply high is exactly (difference * adaptationRate) >> 12. */
+    static INLINE void UpdatePairBit0(short * probability, const int threshold, const int adaptationRate)
+    {
+#if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE2
+        __m128i pair = _mm_cvtsi32_si128(bsc_unaligned_load<int>((const unsigned char *)probability));
+        pair = _mm_add_epi16(pair, _mm_mulhi_epi16(_mm_sub_epi16(_mm_set1_epi16((short)(4096 - threshold)), pair), _mm_set1_epi16((short)(adaptationRate << 4))));
+        bsc_unaligned_store<int>((unsigned char *)probability, _mm_cvtsi128_si32(pair));
+#else
+        UpdateBit0(probability[0], threshold, adaptationRate);
+        UpdateBit0(probability[1], threshold, adaptationRate);
+#endif
+    };
+
+    static INLINE void UpdatePairBit1(short * probability, const int threshold, const int adaptationRate)
+    {
+#if LIBBSC_CPU_FEATURE >= LIBBSC_CPU_FEATURE_SSE2
+        __m128i pair = _mm_cvtsi32_si128(bsc_unaligned_load<int>((const unsigned char *)probability));
+        pair = _mm_sub_epi16(pair, _mm_mulhi_epi16(_mm_sub_epi16(pair, _mm_set1_epi16((short)threshold)), _mm_set1_epi16((short)(adaptationRate << 4))));
+        bsc_unaligned_store<int>((unsigned char *)probability, _mm_cvtsi128_si32(pair));
+#else
+        UpdateBit1(probability[0], threshold, adaptationRate);
+        UpdateBit1(probability[1], threshold, adaptationRate);
+#endif
+    };
+
     template <int R> static INLINE void UpdateBit(unsigned int bit, short & probability, const int threshold0, const int threshold1)
     {
         probability = probability - ((probability - (bit ? threshold1 : threshold0)) >> R);
+    }
+
+    template <int R> static INLINE void UpdateBitMask(unsigned int mask, short & probability, const int value, const int threshold0, const int threshold1)
+    {
+        probability = (short)(value - ((value - (threshold0 + ((threshold1 - threshold0) & (int)mask))) >> R));
     }
 
     template <int R> static INLINE void UpdateBit(short & probability, const int threshold)
@@ -117,7 +142,7 @@ public:
         stretchedProbability1 = bsc_stretch(probability1);
         stretchedProbability2 = bsc_stretch(probability2);
 
-        short stretchedProbability = (stretchedProbability0 * weight0 + stretchedProbability1 * weight1 + stretchedProbability2 * weight2) >> 17;
+        short stretchedProbability = (int)((unsigned int)stretchedProbability0 * weight0 + (unsigned int)stretchedProbability1 * weight1 + (unsigned int)stretchedProbability2 * weight2) >> 17;
 
         if (stretchedProbability < -2047) stretchedProbability = -2047;
         if (stretchedProbability >  2047) stretchedProbability =  2047;
@@ -139,7 +164,7 @@ public:
         const short stretchedProbability1 = bsc_stretch(probability1);
         const short stretchedProbability2 = bsc_stretch(probability2);
 
-        short stretchedProbability = (stretchedProbability0 * weight0 + stretchedProbability1 * weight1 + stretchedProbability2 * weight2) >> 17;
+        short stretchedProbability = (int)((unsigned int)stretchedProbability0 * weight0 + (unsigned int)stretchedProbability1 * weight1 + (unsigned int)stretchedProbability2 * weight2) >> 17;
 
         if (stretchedProbability < -2047) stretchedProbability = -2047;
         if (stretchedProbability >  2047) stretchedProbability =  2047;
@@ -153,8 +178,7 @@ public:
         const int mappedProbability = probabilityMapEntry[0] + (((probabilityMapEntry[1] - probabilityMapEntry[0]) * weight) >> 8);
         const int mixedProbability  = (3 * probability + mappedProbability) >> 2;
 
-        ProbabilityCounter::UpdateBit0(probabilityMapEntry[0], threshold, adaptationRate);
-        ProbabilityCounter::UpdateBit0(probabilityMapEntry[1], threshold, adaptationRate);
+        ProbabilityCounter::UpdatePairBit0(probabilityMapEntry, threshold, adaptationRate);
 
         const int eps = mixedProbability - 4095;
 
@@ -174,7 +198,7 @@ public:
         const short stretchedProbability1 = bsc_stretch(probability1);
         const short stretchedProbability2 = bsc_stretch(probability2);
 
-        short stretchedProbability = (stretchedProbability0 * weight0 + stretchedProbability1 * weight1 + stretchedProbability2 * weight2) >> 17;
+        short stretchedProbability = (int)((unsigned int)stretchedProbability0 * weight0 + (unsigned int)stretchedProbability1 * weight1 + (unsigned int)stretchedProbability2 * weight2) >> 17;
 
         if (stretchedProbability < -2047) stretchedProbability = -2047;
         if (stretchedProbability >  2047) stretchedProbability =  2047;
@@ -188,8 +212,7 @@ public:
         const int mappedProbability = probabilityMapEntry[0] + (((probabilityMapEntry[1] - probabilityMapEntry[0]) * weight) >> 8);
         const int mixedProbability  = (3 * probability + mappedProbability) >> 2;
 
-        ProbabilityCounter::UpdateBit1(probabilityMapEntry[0], threshold, adaptationRate);
-        ProbabilityCounter::UpdateBit1(probabilityMapEntry[1], threshold, adaptationRate);
+        ProbabilityCounter::UpdatePairBit1(probabilityMapEntry, threshold, adaptationRate);
 
         const int eps = mixedProbability - 1;
 
@@ -204,8 +227,7 @@ public:
                            const int threshold,     const int adaptationRate
     )
     {
-        ProbabilityCounter::UpdateBit0(probabilityMap[index], threshold, adaptationRate);
-        ProbabilityCounter::UpdateBit0(probabilityMap[index + 1], threshold, adaptationRate);
+        ProbabilityCounter::UpdatePairBit0(& probabilityMap[index], threshold, adaptationRate);
 
         const int eps = mixedProbability - 4095;
 
@@ -218,8 +240,7 @@ public:
                            const int threshold,     const int adaptationRate
     )
     {
-        ProbabilityCounter::UpdateBit1(probabilityMap[index], threshold, adaptationRate);
-        ProbabilityCounter::UpdateBit1(probabilityMap[index + 1], threshold, adaptationRate);
+        ProbabilityCounter::UpdatePairBit1(& probabilityMap[index], threshold, adaptationRate);
 
         const int eps = mixedProbability - 1;
 

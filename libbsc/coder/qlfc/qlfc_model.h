@@ -175,6 +175,34 @@ const int F_RUN_MP_TH1 = -214; const int F_RUN_MP_AR1 =   19;
 const int F_RUN_MM_LR0 =    7; const int F_RUN_MM_LR1 =   15;
 const int F_RUN_MM_LR2 =   10;
 
+const int F_RANK_M_UPDATE[3][2][2] =
+{
+    { { F_RANK_MS_AR0, (4096 - F_RANK_MS_TH0) * F_RANK_MS_AR0 - 4095 }, { F_RANK_MS_AR1, F_RANK_MS_TH1 * F_RANK_MS_AR1 } },
+    { { F_RANK_MC_AR0, (4096 - F_RANK_MC_TH0) * F_RANK_MC_AR0 - 4095 }, { F_RANK_MC_AR1, F_RANK_MC_TH1 * F_RANK_MC_AR1 } },
+    { { F_RANK_MP_AR0, (4096 - F_RANK_MP_TH0) * F_RANK_MP_AR0 - 4095 }, { F_RANK_MP_AR1, F_RANK_MP_TH1 * F_RANK_MP_AR1 } }
+};
+
+const int F_RANK_P_UPDATE[3][2][2] =
+{
+    { { F_RANK_PS_AR0, (4096 - F_RANK_PS_TH0) * F_RANK_PS_AR0 - 4095 }, { F_RANK_PS_AR1, F_RANK_PS_TH1 * F_RANK_PS_AR1 } },
+    { { F_RANK_PC_AR0, (4096 - F_RANK_PC_TH0) * F_RANK_PC_AR0 - 4095 }, { F_RANK_PC_AR1, F_RANK_PC_TH1 * F_RANK_PC_AR1 } },
+    { { F_RANK_PP_AR0, (4096 - F_RANK_PP_TH0) * F_RANK_PP_AR0 - 4095 }, { F_RANK_PP_AR1, F_RANK_PP_TH1 * F_RANK_PP_AR1 } }
+};
+
+const int F_RANK_P_NEAR = 512;
+
+const int F_RUN_M_UPDATE[3][2][2] =
+{
+    { { F_RUN_MS_AR0, (4096 - F_RUN_MS_TH0) * F_RUN_MS_AR0 - 4095 }, { F_RUN_MS_AR1, F_RUN_MS_TH1 * F_RUN_MS_AR1 } },
+    { { F_RUN_MC_AR0, (4096 - F_RUN_MC_TH0) * F_RUN_MC_AR0 - 4095 }, { F_RUN_MC_AR1, F_RUN_MC_TH1 * F_RUN_MC_AR1 } },
+    { { F_RUN_MP_AR0, (4096 - F_RUN_MP_TH0) * F_RUN_MP_AR0 - 4095 }, { F_RUN_MP_AR1, F_RUN_MP_TH1 * F_RUN_MP_AR1 } }
+};
+
+const int F_RUN_M_NEAR = 512;
+
+/* Where the row of the k-bit rank mantissa starts in a context's row of 256 counters (Rank.Mantissa below). */
+static INLINE int bsc_qlfc_mantissa_row_start(int bitRankSize) { return 1 << bitRankSize; }
+
 struct QlfcStatisticalModel1
 {
 
@@ -193,12 +221,14 @@ public:
             short CharModel[ALPHABET_SIZE][8];
         } Exponent;
 
+        /* The k-bit mantissa (k = 1 to 7) is coded through the contexts 1 to 2^k - 1. The mantissas of all rank sizes share */
+        /* one row of 256 counters per context: the k-bit mantissa's row starts at counter 2^k (its context c is 2^k + c).  */
         struct Mantissa
         {
-            short StaticModel[128];
-            short StateModel[ALPHABET_SIZE][128];
-            short CharModel[ALPHABET_SIZE][128];
-        } Mantissa[8];
+            short StaticModel[256];
+            short StateModel[ALPHABET_SIZE][256];
+            short CharModel[ALPHABET_SIZE][256];
+        } Mantissa;
 
         struct Escape
         {
@@ -230,6 +260,12 @@ public:
         } Mantissa[32];
 
     } Run;
+};
+
+struct QlfcStatisticalModel2 : public QlfcStatisticalModel1
+{
+
+public:
 
     ProbabilityMixer mixerOfRank[ALPHABET_SIZE];
     ProbabilityMixer mixerOfRankExponent[8][8];
@@ -240,7 +276,7 @@ public:
     ProbabilityMixer mixerOfRunMantissa[32];
 };
 
-struct QlfcStatisticalModel2
+struct QlfcStatisticalModel3
 {
 
 public:
@@ -248,7 +284,7 @@ public:
     struct Rank
     {
         short Exponent[ALPHABET_SIZE][8];
-        short Mantissa[ALPHABET_SIZE][8][128];
+        short Mantissa[ALPHABET_SIZE][256]; /* one row per character: the k-bit mantissa's row starts at counter 2^k */
     } Rank;
 
     struct Run
@@ -258,9 +294,9 @@ public:
     } Run;
 };
 
-int  bsc_qlfc_init_static_model();
 void bsc_qlfc_init_model(QlfcStatisticalModel1 * model);
 void bsc_qlfc_init_model(QlfcStatisticalModel2 * model);
+void bsc_qlfc_init_model(QlfcStatisticalModel3 * model);
 
 #endif
 

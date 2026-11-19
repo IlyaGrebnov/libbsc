@@ -179,6 +179,26 @@ See also the bsc and libbsc web site:
     #endif
 #endif
 
+#ifdef __cplusplus
+
+#include <string.h>
+
+/* Loads and stores at byte offsets (a block header inside a larger buffer, LZP's words) can be at */
+/* any address, so they are made with memcpy. Casting such an address to a wider pointer is undefined behavior, and on */
+/* strict-alignment targets such as 32-bit ARM the compiler can merge such accesses into ldm/ldrd, which fault (SIGBUS) on */
+/* unaligned addresses. */
+template <class T> INLINE T bsc_unaligned_load(const unsigned char * p)
+{
+    T v; memcpy(&v, p, sizeof(T)); return v;
+}
+
+template <class T> INLINE void bsc_unaligned_store(unsigned char * p, T v)
+{
+    memcpy(p, &v, sizeof(T));
+}
+
+#endif
+
 #ifndef LIBBSC_API
   #ifdef _WIN32
     #ifdef LIBBSC_SHARED

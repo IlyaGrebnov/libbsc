@@ -1,3 +1,15 @@
+Changes in 3.4.1 (November 18, 2026)
+- Updated libsais to v2.12.2.
+- Improved LZP compression and decompression performance.
+- Improved QLFC compression and decompression performance.
+- Improved multi-block compression and decompression performance.
+- Improved multithreaded decompression performance on small and medium blocks.
+- Fixed signed integer overflow in the QLFC adaptive coder.
+- Fixed out-of-bounds read in contexts autodetection on one-byte blocks.
+- Fixed data race in segmentation detection.
+- Fixed detection of truncated archives.
+- Removed AVX512 variant of the QLFC transform; AVX512 processors use the AVX2 code.
+
 Changes in 3.4.0 (October 21, 2026)
 - Updated libsais to v2.12.1.
 - Fixed data corruption in multithreaded compression (present since 3.1.0).

@@ -55,28 +55,32 @@ private:
     unsigned int ari_cache;
     unsigned int ari_range;
 
-    const unsigned short * RESTRICT ari_input;
-          unsigned short * RESTRICT ari_output;
-          unsigned short * RESTRICT ari_outputEOB;
-          unsigned short * RESTRICT ari_outputStart;
+#if defined(__GNUC__) || defined(__clang__)
+    typedef unsigned short unaligned_ushort __attribute__ ((aligned(1)));
+#else
+    typedef unsigned short unaligned_ushort;
+#endif
+
+    const unaligned_ushort * RESTRICT ari_input;
+          unaligned_ushort * RESTRICT ari_output;
+          unaligned_ushort * RESTRICT ari_outputEOB;
+          unaligned_ushort * RESTRICT ari_outputStart;
 
     INLINE void OutputShort(unsigned short s)
     {
-#ifndef LIBBSC_NO_UNALIGNED_ACCESS
+#if defined(LIBBSC_x86_64) || defined(LIBBSC_AArch64)
         *ari_output++ = s;
 #else
-        memcpy(ari_output++, &s, sizeof(unsigned short));
+        bsc_unaligned_store<unsigned short>((unsigned char *)ari_output++, s);
 #endif
     };
 
     INLINE unsigned short InputShort()
     {
-#ifndef LIBBSC_NO_UNALIGNED_ACCESS
+#if defined(LIBBSC_x86_64) || defined(LIBBSC_AArch64)
         return *ari_input++;
 #else
-        unsigned short s;
-        memcpy(&s, ari_input++, sizeof(unsigned short));
-        return s;
+        return bsc_unaligned_load<unsigned short>((const unsigned char *)ari_input++);
 #endif
     };
 
@@ -122,9 +126,9 @@ public:
 
     INLINE void InitEncoder(unsigned char * output, int outputSize)
     {
-        ari_outputStart = (unsigned short *)output;
-        ari_output      = (unsigned short *)output;
-        ari_outputEOB   = (unsigned short *)(output + outputSize - 16);
+        ari_outputStart = (unaligned_ushort *)output;
+        ari_output      = (unaligned_ushort *)output;
+        ari_outputEOB   = (unaligned_ushort *)(output + outputSize - 16);
         ari.low         = 0;
         ari_ffnum       = 0;
         ari_cache       = 0;
@@ -176,6 +180,57 @@ public:
         ari_range = range   + ((~bit + 1u) & (ari_range - range - range));
     }
 
+    INLINE void BeginEncode(unsigned long long & low, unsigned int & range)
+    {
+        low = ari.low; range = ari_range;
+    }
+
+    INLINE void EndEncode(unsigned long long low, unsigned int range)
+    {
+        ari.low = low; ari_range = range;
+    }
+
+    INLINE unsigned int ShiftLow(unsigned long long & low, unsigned int range)
+    {
+        ari.low = low; ari_range = range; range = ShiftLow(); low = ari.low;
+
+        return range;
+    }
+
+    template <int P = 12> INLINE void EncodeBit0(unsigned long long & low, unsigned int & range, int probability)
+    {
+        if (range < 0x10000)
+        {
+            range = ShiftLow(low, range);
+        }
+
+        range = (range >> P) * probability;
+    }
+
+    template <int P = 12> INLINE void EncodeBit1(unsigned long long & low, unsigned int & range, int probability)
+    {
+        if (range < 0x10000)
+        {
+            range = ShiftLow(low, range);
+        }
+
+        unsigned int r = (range >> P) * probability;
+        low += r; range -= r;
+    }
+
+    template <int P = 12> INLINE void EncodeBit(unsigned long long & low, unsigned int & range, unsigned int bit, int probability)
+    {
+        if (range < 0x10000)
+        {
+            range = ShiftLow(low, range);
+        }
+
+        unsigned int r = (range >> P) * probability;
+
+        low   = low   + ((~bit + 1u) & r);
+        range = r     + ((~bit + 1u) & (range - r - r));
+    }
+
     INLINE void EncodeBit(unsigned int bit)
     {
         if (bit) EncodeBit1(2048); else EncodeBit0(2048);
@@ -199,12 +254,17 @@ public:
 
     INLINE void InitDecoder(const unsigned char * input)
     {
-        ari_input = (unsigned short *)input;
+        ari_input = (unaligned_ushort *)input;
         ari_code  = 0;
         ari_range = 0xffffffff;
         ari_code  = (ari_code << 16) | InputShort();
         ari_code  = (ari_code << 16) | InputShort();
         ari_code  = (ari_code << 16) | InputShort();
+    };
+
+    INLINE void InitDecoder(const RangeCoder & coder)
+    {
+        ari_input = coder.ari_input; ari_code = coder.ari_code; ari_range = coder.ari_range;
     };
 
     template <int P = 12> INLINE int PeakBit(int probability)
@@ -231,6 +291,39 @@ public:
         ari_code  = bit ? ari_code  - range : ari_code;
 
         return bit;
+    }
+
+    template <int P = 12> INLINE unsigned int DecodeBitValue(int probability)
+    {
+        if (ari_range < 0x10000)
+        {
+            ari_range <<= 16; ari_code = (ari_code << 16) | InputShort();
+        }
+
+        unsigned int range = (ari_range >> P) * probability;
+        unsigned int bit   = ari_code >= range;
+        unsigned int mask  = 0 - bit;
+
+        ari_code  = ari_code - (range & mask);
+        ari_range = range + ((ari_range - range - range) & mask);
+
+        return bit;
+    }
+
+    template <int P = 12> INLINE unsigned int DecodeBitMask(int probability)
+    {
+        if (ari_range < 0x10000)
+        {
+            ari_range <<= 16; ari_code = (ari_code << 16) | InputShort();
+        }
+
+        unsigned int range = (ari_range >> P) * probability;
+        unsigned int mask  = 0 - (unsigned int)(ari_code >= range);
+
+        ari_code  = ari_code - (range & mask);
+        ari_range = range + ((ari_range - range - range) & mask);
+
+        return mask;
     }
 
     template <int P = 12> INLINE void DecodeBit0(int probability)
